@@ -814,7 +814,17 @@
   "stock_issue_items": [],
   "stock_returns": [],
   "supplier_returns": [],
-  "stock_transfers": [],
+  "stock_transfers": [
+    {
+      "id": "trn-1",
+      "transfer_number": "TRN-2026-006002",
+      "transfer_date": "2026-08-17",
+      "from_warehouse_id": "wh-01",
+      "to_warehouse_id": "wh-02",
+      "status": "In Transit",
+      "created_at": "2026-08-17T16:57:35.146732"
+    }
+  ],
   "stock_transfer_items": [],
   "stock_adjustments": [],
   "stock_count_sessions": [],
@@ -853,7 +863,7 @@
       "PO": 3001,
       "GRN": 4001,
       "ISS": 5001,
-      "TRN": 6001,
+      "TRN": 6002,
       "ADJ": 7001
     }
   }

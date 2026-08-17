@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from db.database_store import db, save_db, get_next_doc_number
 from schemas.schemas import IndentCreate
 from datetime import datetime
+from typing import Dict, Any
 
 router = APIRouter(prefix="/api/indents", tags=["Indents"])
 
@@ -59,6 +60,27 @@ def create_indent(req: IndentCreate):
     save_db()
     return {"success": True, "data": new_indent}
 
+# STATIC ENDPOINTS MUST BE DEFINED BEFORE PARAMETERIZED /{indent_id} TO PREVENT 404!
+@router.get("/stock-review-queue")
+def get_stock_review_queue():
+    approved_indents = [i for i in db["indents"] if i.get("status") in ["Approved", "Submitted"]]
+    return {"success": True, "data": approved_indents}
+
+@router.post("/stock-review-action")
+def execute_stock_review_action(payload: Dict[str, Any]):
+    indent_id = payload.get("indent_id")
+    action = payload.get("action")  # 'ISSUE_STOCK', 'PURCHASE_FULL', 'PURCHASE_PARTIAL'
+    
+    indent = next((i for i in db["indents"] if i["id"] == indent_id), None)
+    if indent:
+        if action == "ISSUE_STOCK":
+            indent["status"] = "Fulfilled"
+        else:
+            indent["status"] = "Converted to RFQ"
+        save_db()
+        return {"success": True, "message": f"Stock review action '{action}' recorded for indent {indent_id}."}
+    return {"success": False, "message": "Indent not found"}
+
 @router.get("/{indent_id}")
 def get_indent(indent_id: str):
     indent = next((i for i in db["indents"] if i["id"] == indent_id), None)
@@ -83,6 +105,21 @@ def cancel_indent(indent_id: str):
         save_db()
         return {"success": True, "data": indent}
     return {"success": False, "message": "Indent not found"}
+
+@router.post("/{indent_id}/copy")
+def copy_indent(indent_id: str):
+    original = next((i for i in db["indents"] if i["id"] == indent_id), None)
+    if original:
+        copied = {**original, "id": f"ind-{len(db['indents'])+1002}", "indent_number": get_next_doc_number("IND"), "status": "Draft"}
+        db["indents"].append(copied)
+        save_db()
+        return {"success": True, "data": copied}
+    return {"success": False, "message": "Original indent not found"}
+
+@router.get("/{indent_id}/history")
+def get_indent_history(indent_id: str):
+    history = [l for l in db["audit_logs"] if l.get("record_id") == indent_id]
+    return {"success": True, "data": history}
 
 @router.delete("/{indent_id}")
 def delete_indent(indent_id: str):
