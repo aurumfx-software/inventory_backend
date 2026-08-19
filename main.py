@@ -16,11 +16,14 @@ from routers.inventory_ops import router as inventory_ops_router
 from routers.reports import router as reports_router
 from routers.settings_audit import router as settings_audit_router
 
+root_path = os.getenv("ROOT_PATH", "")
+
 # Initialize FastAPI Application
 app = FastAPI(
     title="Inventory & Procurement System API",
     description="Enterprise Python & FastAPI Backend for Inventory & Procurement Desktop Application",
-    version="1.0.0"
+    version="1.0.0",
+    root_path=root_path
 )
 
 cors_origins_raw = os.getenv("CORS_ORIGINS", "*")
@@ -52,9 +55,15 @@ def root():
     return {
         "success": True,
         "message": "Inventory & Procurement API Backend is running.",
-        "docs": "http://127.0.0.1:8000/docs",
-        "health": "http://127.0.0.1:8000/api/health"
+        "docs": "/docs",
+        "health": "/api/health"
     }
+
+# OpenAPI specification endpoint fallbacks for reverse proxies
+@app.get("/api/openapi.json", include_in_schema=False)
+@app.get("/openapi.json", include_in_schema=False)
+def get_openapi_schema():
+    return app.openapi()
 
 # Healthcheck Endpoint
 @app.get("/api/health")
