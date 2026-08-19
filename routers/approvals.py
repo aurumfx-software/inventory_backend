@@ -6,22 +6,28 @@ from typing import Optional, Dict, Any
 router = APIRouter(prefix="/api/approvals", tags=["Approvals"])
 
 class ApprovalAction(BaseModel):
-    approval_id: str
-    action: str  # 'Approve' | 'Reject'
+    approval_id: Optional[str] = None
+    action: str  # 'Approve' | 'Reject' | 'Return' | 'Forward' | 'Delegate'
     comments: Optional[str] = ""
+    user_id: Optional[str] = None
+    user_name: Optional[str] = None
+    approved_items: Optional[Any] = None
+    forward_user_id: Optional[str] = None
+    delegate_user_id: Optional[str] = None
+    is_admin_override: Optional[bool] = False
 
 @router.get("")
 @router.get("/requests")
 def get_approval_requests():
-    return {"success": True, "data": db["approval_requests"]}
+    return {"success": True, "data": db.get("approval_requests", [])}
 
 @router.get("/history")
 def get_approval_history():
-    return {"success": True, "data": [a for a in db["approval_requests"] if a.get("status") in ["Approved", "Rejected"]]}
+    return {"success": True, "data": [a for a in db.get("approval_requests", []) if a.get("status") in ["Approved", "Rejected", "Returned for Correction"]]}
 
 @router.get("/workflows")
 def get_approval_workflows():
-    return {"success": True, "data": db["approval_workflows"]}
+    return {"success": True, "data": db.get("approval_workflows", [])}
 
 @router.get("/delegations")
 def get_approval_delegations():
@@ -51,16 +57,25 @@ def create_approval_delegation(payload: Dict[str, Any]):
 @router.post("/{approval_id}/action")
 def take_approval_action(req: ApprovalAction, approval_id: Optional[str] = None):
     app_id = req.approval_id or approval_id
-    app_req = next((a for a in db["approval_requests"] if a["id"] == app_id), None)
+    app_req = next((a for a in db.get("approval_requests", []) if a["id"] == app_id), None)
     if app_req:
-        app_req["status"] = "Approved" if req.action == "Approve" else "Rejected"
+        new_status = "Approved" if req.action == "Approve" else "Rejected" if req.action == "Reject" else "Returned for Correction" if req.action == "Return" else req.action
+        app_req["status"] = new_status
         app_req["comments"] = req.comments or ""
 
-        if app_req.get("transaction_type") == "INDENT":
-            ind = next((i for i in db["indents"] if i["id"] == app_req.get("transaction_id")), None)
+        txn_type = str(app_req.get("transaction_type", "")).upper()
+        txn_id = app_req.get("transaction_id")
+
+        if "INDENT" in txn_type:
+            ind = next((i for i in db.get("indents", []) if i["id"] == txn_id or i.get("indent_number") == txn_id), None)
             if ind:
-                ind["status"] = "Approved" if req.action == "Approve" else "Rejected"
+                ind["status"] = new_status
+        elif "PURCHASE" in txn_type or "PO" in txn_type:
+            po = next((p for p in db.get("purchase_orders", []) if p["id"] == txn_id or p.get("po_number") == txn_id), None)
+            if po:
+                po["status"] = new_status
 
         save_db()
-        return {"success": True, "message": f"Transaction {req.action}d successfully"}
+        return {"success": True, "message": f"Approval action '{req.action}' processed successfully."}
     return {"success": False, "message": "Approval request not found"}
+
