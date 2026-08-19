@@ -20,17 +20,11 @@ from routers.dashboard import router as dashboard_router
 root_path = os.getenv("ROOT_PATH", "")
 
 # Initialize FastAPI Application
-# app = FastAPI(
-#     title="Inventory & Procurement System API",
-#     description="Enterprise Python & FastAPI Backend for Inventory & Procurement Desktop Application",
-#     version="1.0.0",
-#     root_path=root_path
-# )
-
 app = FastAPI(
     title="Inventory & Procurement System API",
     description="Enterprise Python & FastAPI Backend for Inventory & Procurement Desktop Application",
     version="1.0.0",
+    root_path=root_path,
     docs_url="/api/docs",
     openapi_url="/api/openapi.json"
 )
@@ -65,14 +59,13 @@ def root():
     return {
         "success": True,
         "message": "Inventory & Procurement API Backend is running.",
-        "docs": "/docs",
+        "docs": "/api/docs",
         "health": "/api/health"
     }
 
-# OpenAPI specification endpoint fallbacks for reverse proxies
-@app.get("/api/openapi.json", include_in_schema=False)
+# Fallback endpoint for /openapi.json
 @app.get("/openapi.json", include_in_schema=False)
-def get_openapi_schema():
+def get_openapi_schema_fallback():
     return app.openapi()
 
 # Healthcheck Endpoint
