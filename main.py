@@ -15,15 +15,24 @@ from routers.procurement import router as procurement_router
 from routers.inventory_ops import router as inventory_ops_router
 from routers.reports import router as reports_router
 from routers.settings_audit import router as settings_audit_router
+from routers.dashboard import router as dashboard_router
 
 root_path = os.getenv("ROOT_PATH", "")
 
 # Initialize FastAPI Application
+# app = FastAPI(
+#     title="Inventory & Procurement System API",
+#     description="Enterprise Python & FastAPI Backend for Inventory & Procurement Desktop Application",
+#     version="1.0.0",
+#     root_path=root_path
+# )
+
 app = FastAPI(
     title="Inventory & Procurement System API",
     description="Enterprise Python & FastAPI Backend for Inventory & Procurement Desktop Application",
     version="1.0.0",
-    root_path=root_path
+    docs_url="/api/docs",
+    openapi_url="/api/openapi.json"
 )
 
 cors_origins_raw = os.getenv("CORS_ORIGINS", "*")
@@ -48,6 +57,7 @@ app.include_router(procurement_router)
 app.include_router(inventory_ops_router)
 app.include_router(reports_router)
 app.include_router(settings_audit_router)
+app.include_router(dashboard_router)
 
 # Root Endpoint
 @app.get("/")

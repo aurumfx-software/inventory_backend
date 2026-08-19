@@ -61,57 +61,219 @@ INITIAL_RFQS = [
     }
 ]
 
+@router.get("/rfqs/suggested-suppliers")
+def get_suggested_suppliers(item_ids: Optional[str] = None, category_id: Optional[str] = None, delivery_location: Optional[str] = None):
+    suppliers = [s for s in db.get("suppliers", []) if s.get("is_active") is not False and s.get("approval_status") == "Approved"]
+    
+    suggested = []
+    for s in suppliers:
+        rating = float(s.get("rating", 4.5))
+        lead_time = int(s.get("delivery_lead_time_days", 5))
+        category_match = True if category_id and s.get("category_id") == category_id else False
+        
+        # Calculate intelligent recommendation score
+        score = rating * 20 + (10 if category_match else 0) + (10 if lead_time <= 5 else 0)
+        
+        suggested.append({
+            **s,
+            "match_score": min(100, score),
+            "recommendation_reason": f"Rating {rating}/5.0 • Lead time {lead_time} days • Approved Vendor"
+        })
+        
+    suggested.sort(key=lambda x: x["match_score"], reverse=True)
+    return {"success": True, "data": suggested}
+
 @router.get("/rfqs")
 def get_rfqs():
     if not db.get("rfqs"):
         db["rfqs"] = INITIAL_RFQS
         save_db()
-    return {"success": True, "data": db["rfqs"]}
+        
+    # Enrich RFQs with supplier count and items count
+    enriched = []
+    for rfq in db["rfqs"]:
+        sup_ids = rfq.get("supplier_ids", [])
+        suppliers = [s for s in db.get("suppliers", []) if s["id"] in sup_ids]
+        enriched.append({
+            **rfq,
+            "suppliers": suppliers,
+            "supplier_count": len(suppliers) or len(sup_ids) or 2
+        })
+    return {"success": True, "data": enriched}
 
 @router.post("/rfqs")
-def create_rfq(payload: Dict[str, Any]):
-    rfq_num = get_next_doc_number("RFQ")
+def create_or_update_rfq(payload: Dict[str, Any]):
+    if not db.get("rfqs"):
+        db["rfqs"] = INITIAL_RFQS
+
+    rfq_id = payload.get("id")
+    now_iso = datetime.now().isoformat()
+
+    # Preserve snapshot of item master details per implementation rule!
+    processed_items = []
+    for idx, item in enumerate(payload.get("items", [])):
+        item_id = item.get("item_id")
+        item_master = next((im for im in db.get("items", []) if im["id"] == item_id), {})
+        
+        processed_items.append({
+            "item_id": item_id,
+            "item_code_snapshot": item.get("item_code_snapshot") or item_master.get("item_code", f"ITM-SNAP-{idx+1}"),
+            "item_name_snapshot": item.get("item_name_snapshot") or item_master.get("item_name", "Material Item"),
+            "specification": item.get("specification") or item_master.get("description", "Standard Specifications"),
+            "quantity": float(item.get("quantity", 1)),
+            "unit": item.get("unit") or item_master.get("uom_symbol") or "Pcs",
+            "required_delivery_date": item.get("required_delivery_date") or payload.get("closing_date"),
+            "acceptable_brands": item.get("acceptable_brands") or item_master.get("preferred_brand_name") or "Standard Brands",
+            "technical_document": item.get("technical_document"),
+            "remarks": item.get("remarks", "")
+        })
+
+    if rfq_id:
+        rfq = next((r for r in db["rfqs"] if r["id"] == rfq_id), None)
+        if rfq:
+            rfq.update({
+                "closing_date": payload.get("closing_date", rfq.get("closing_date")),
+                "buyer": payload.get("buyer", rfq.get("buyer")),
+                "delivery_location": payload.get("delivery_location", rfq.get("delivery_location")),
+                "currency": payload.get("currency", rfq.get("currency")),
+                "terms": payload.get("terms", rfq.get("terms")),
+                "contact_person": payload.get("contact_person", rfq.get("contact_person")),
+                "source_indent_numbers": payload.get("source_indent_numbers", rfq.get("source_indent_numbers")),
+                "supplier_ids": payload.get("supplier_ids", rfq.get("supplier_ids")),
+                "status": payload.get("status", rfq.get("status")),
+                "attachments": payload.get("attachments", rfq.get("attachments")),
+                "items": processed_items,
+                "updated_at": now_iso
+            })
+            save_db()
+            return {"success": True, "data": rfq, "message": "RFQ updated successfully with snapshot preserved."}
+
+    # Create New RFQ
+    rfq_num = payload.get("rfq_number") or get_next_doc_number("RFQ")
     new_rfq = {
-        "id": f"rfq-{len(db['rfqs']) + 1}",
+        "id": f"rfq-{len(db['rfqs']) + 1001}",
         "rfq_number": rfq_num,
-        "rfq_date": datetime.now().strftime("%Y-%m-%d"),
-        "indent_id": payload.get("indent_id", "ind-1001"),
-        "status": "Published",
-        "due_date": payload.get("due_date", "2026-08-28"),
-        "created_at": datetime.now().isoformat()
+        "rfq_date": payload.get("rfq_date") or datetime.now().strftime("%Y-%m-%d"),
+        "closing_date": payload.get("closing_date") or datetime.now().strftime("%Y-%m-%d"),
+        "buyer": payload.get("buyer", "Sarah Jenkins (Super Administrator)"),
+        "delivery_location": payload.get("delivery_location", "Central Goods Warehouse, Main Branch"),
+        "currency": payload.get("currency", "INR"),
+        "terms": payload.get("terms", "FOB Destination, Payment Net 30 days after GRN approval."),
+        "contact_person": payload.get("contact_person", "Sarah Jenkins (procurement@company.com)"),
+        "source_indent_numbers": payload.get("source_indent_numbers", ["IND-2026-001001"]),
+        "supplier_ids": payload.get("supplier_ids", ["sup-01", "sup-02"]),
+        "status": payload.get("status", "Draft"),
+        "attachments": payload.get("attachments", []),
+        "items": processed_items,
+        "created_at": now_iso
     }
     db["rfqs"].append(new_rfq)
+
+    # Log Audit
+    db["audit_logs"].append({
+        "id": f"aud-{len(db['audit_logs']) + 1}",
+        "user_id": "usr-01",
+        "action": "RFQ_CREATED",
+        "module": "PROCUREMENT",
+        "record_id": new_rfq["id"],
+        "details": f"Created RFQ {rfq_num} with snapshot preservation for {len(processed_items)} items.",
+        "timestamp": now_iso,
+        "ip_address": "127.0.0.1"
+    })
+
     save_db()
-    return {"success": True, "data": new_rfq}
+    return {"success": True, "data": new_rfq, "message": "New Request for Quotation created successfully."}
 
 @router.get("/rfqs/{rfq_id}")
 def get_rfq(rfq_id: str):
-    rfq = next((r for r in db["rfqs"] if r["id"] == rfq_id or r.get("rfq_number") == rfq_id), None)
+    rfq = next((r for r in db.get("rfqs", []) if r["id"] == rfq_id or r.get("rfq_number") == rfq_id), None)
     if rfq:
-        return {"success": True, "data": rfq}
+        sup_ids = rfq.get("supplier_ids", [])
+        suppliers = [s for s in db.get("suppliers", []) if s["id"] in sup_ids]
+        return {"success": True, "data": {**rfq, "suppliers": suppliers}}
     return {"success": False, "message": "RFQ not found"}
 
 @router.post("/rfqs/{rfq_id}/send")
-def send_rfq(rfq_id: str):
-    rfq = next((r for r in db["rfqs"] if r["id"] == rfq_id), None)
+def send_rfq(rfq_id: str, payload: Optional[Dict[str, Any]] = None):
+    rfq = next((r for r in db.get("rfqs", []) if r["id"] == rfq_id or r.get("rfq_number") == rfq_id), None)
     if rfq:
-        rfq["status"] = "Sent to Suppliers"
+        now_iso = datetime.now().isoformat()
+        rfq["status"] = "Sent"
+        rfq["sent_at"] = now_iso
+
+        send_method = payload.get("send_method", "Email with PDF attachment") if payload else "Email with PDF attachment"
+        recipient_emails = payload.get("recipient_emails", "vendors@procurement-suppliers.com") if payload else "vendors@procurement-suppliers.com"
+
+        # Record in rfq_email_logs table
+        if "rfq_email_logs" not in db:
+            db["rfq_email_logs"] = []
+
+        log_entry = {
+            "id": f"log-{len(db['rfq_email_logs']) + 1}",
+            "rfq_id": rfq["id"],
+            "rfq_number": rfq.get("rfq_number"),
+            "send_method": send_method,
+            "recipient_emails": recipient_emails,
+            "notes": payload.get("notes", "") if payload else "",
+            "sent_at": now_iso,
+            "status": "Delivered"
+        }
+        db["rfq_email_logs"].append(log_entry)
+
+        db["audit_logs"].append({
+            "id": f"aud-{len(db['audit_logs']) + 1}",
+            "user_id": "usr-01",
+            "action": "RFQ_DISPATCHED",
+            "module": "PROCUREMENT",
+            "record_id": rfq["id"],
+            "details": f"Dispatched RFQ {rfq.get('rfq_number')} via {send_method} to {recipient_emails}",
+            "timestamp": now_iso,
+            "ip_address": "127.0.0.1"
+        })
+
         save_db()
-        return {"success": True, "message": f"RFQ {rfq_id} dispatched to suppliers."}
+        return {"success": True, "message": f"RFQ {rfq.get('rfq_number')} dispatched successfully via {send_method}.", "data": rfq}
     return {"success": False, "message": "RFQ not found"}
 
 @router.post("/rfqs/{rfq_id}/close")
 def close_rfq(rfq_id: str):
-    rfq = next((r for r in db["rfqs"] if r["id"] == rfq_id), None)
+    rfq = next((r for r in db.get("rfqs", []) if r["id"] == rfq_id or r.get("rfq_number") == rfq_id), None)
     if rfq:
         rfq["status"] = "Closed"
         save_db()
-        return {"success": True, "message": f"RFQ {rfq_id} closed."}
+        return {"success": True, "message": f"RFQ {rfq.get('rfq_number')} closed successfully."}
     return {"success": False, "message": "RFQ not found"}
 
 @router.get("/rfqs/{rfq_id}/supplier-status")
 def get_rfq_supplier_status(rfq_id: str):
-    return {"success": True, "data": [{"supplier_id": "sup-01", "status": "Responded"}, {"supplier_id": "sup-02", "status": "Pending"}]}
+    rfq = next((r for r in db.get("rfqs", []) if r["id"] == rfq_id or r.get("rfq_number") == rfq_id), None)
+    sup_ids = rfq.get("supplier_ids", ["sup-01", "sup-02"]) if rfq else ["sup-01", "sup-02"]
+    
+    status_list = []
+    for idx, sid in enumerate(sup_ids):
+        sup = next((s for s in db.get("suppliers", []) if s["id"] == sid), {})
+        status_list.append({
+            "supplier_id": sid,
+            "supplier_code": sup.get("supplier_code", f"SUP-000{idx+45}"),
+            "supplier_name": sup.get("supplier_name", f"Supplier {idx+1}"),
+            "contact_person": sup.get("contact_person", "Sales Manager"),
+            "email": sup.get("email", "orders@supplier.com"),
+            "status": "Responded" if idx == 0 else "Pending",
+            "response_date": "2026-08-18" if idx == 0 else None,
+            "quotation_id": f"qtn-{idx+1}" if idx == 0 else None,
+            "bid_amount": 1420000 if idx == 0 else None
+        })
+
+    return {"success": True, "data": status_list}
+
+@router.delete("/rfqs/{rfq_id}")
+def delete_rfq(rfq_id: str):
+    initial_len = len(db.get("rfqs", []))
+    db["rfqs"] = [r for r in db.get("rfqs", []) if r["id"] != rfq_id and r.get("rfq_number") != rfq_id]
+    if len(db["rfqs"]) < initial_len:
+        save_db()
+        return {"success": True, "message": "RFQ deleted successfully"}
+    return {"success": False, "message": "RFQ not found"}
 
 @router.get("/rfqs/{rfq_id}/comparison")
 def get_rfq_comparison(rfq_id: str):
@@ -172,8 +334,71 @@ def get_rfq_comparison(rfq_id: str):
     }
 
 # =========================================================================
-# QUOTATION MANAGEMENT
+# QUOTATION MANAGEMENT & BACKEND CALCULATIONS
 # =========================================================================
+def compute_quotation_totals(payload: Dict[str, Any]) -> Dict[str, Any]:
+    items = payload.get("items", [])
+    processed_items = []
+    
+    subtotal = 0.0
+    tax_total = 0.0
+    freight_total = 0.0
+    total_landed_cost = 0.0
+
+    for idx, item in enumerate(items):
+        qty = float(item.get("offered_quantity", item.get("quantity", 1)))
+        unit_rate = float(item.get("unit_rate", 0))
+        disc_pct = float(item.get("discount_pct", item.get("discount", 0)))
+        tax_pct = float(item.get("tax_pct", item.get("tax", 18)))
+        freight = float(item.get("freight_amount", item.get("freight", 0)))
+
+        # Mandatory Backend Calculations to prevent manipulation:
+        # 1. Gross Amount = Quantity × Unit Rate
+        gross = qty * unit_rate
+        # 2. Discount Amount = Gross Amount × Discount Percentage / 100
+        disc_amt = (gross * disc_pct) / 100.0
+        # 3. Taxable Amount = Gross Amount - Discount Amount
+        taxable = gross - disc_amt
+        # 4. Tax Amount = Taxable Amount × Tax Percentage / 100
+        tax_amt = (taxable * tax_pct) / 100.0
+        # 5. Line Total = Taxable Amount + Tax Amount + Freight
+        line_total = taxable + tax_amt + freight
+
+        subtotal += taxable
+        tax_total += tax_amt
+        freight_total += freight
+        total_landed_cost += line_total
+
+        processed_items.append({
+            "id": item.get("id") or f"qti-{idx+1}",
+            "rfq_item_id": item.get("rfq_item_id"),
+            "item_id": item.get("item_id", ""),
+            "item_code": item.get("item_code", "ITM-01"),
+            "item_name": item.get("item_name", "Material Item"),
+            "offered_brand": item.get("offered_brand", "Standard Brand"),
+            "offered_quantity": qty,
+            "unit_rate": unit_rate,
+            "discount_pct": disc_pct,
+            "discount_amount": disc_amt,
+            "taxable_amount": taxable,
+            "tax_pct": tax_pct,
+            "tax_amount": tax_amt,
+            "freight_amount": freight,
+            "line_total": line_total,
+            "delivery_days": int(item.get("delivery_days", item.get("delivery_time_days", 7))),
+            "item_warranty": item.get("item_warranty", item.get("warranty", "1 Year Standard")),
+            "technical_compliance": item.get("technical_compliance", "Compliant"),
+            "supplier_remarks": item.get("supplier_remarks", "")
+        })
+
+    return {
+        "items": processed_items,
+        "subtotal": round(subtotal, 2),
+        "tax_total": round(tax_total, 2),
+        "freight_total": round(freight_total, 2),
+        "total_landed_cost": round(total_landed_cost, 2)
+    }
+
 INITIAL_QUOTATIONS = [
     {
         "id": "qte-01",
@@ -190,8 +415,11 @@ INITIAL_QUOTATIONS = [
         "delivery_terms": "FOB Destination",
         "freight_terms": "Freight Prepaid",
         "warranty": "3 Years Onsite Warranty",
+        "attachment": "Infotech_Official_Quote_2026.pdf",
+        "remarks": "Special enterprise volume discount included.",
         "subtotal": 1220338.98,
         "tax_total": 219661.02,
+        "freight_total": 0,
         "total_landed_cost": 1440000,
         "status": "Approved",
         "is_selected": True,
@@ -204,9 +432,15 @@ INITIAL_QUOTATIONS = [
                 "offered_quantity": 20,
                 "unit_rate": 72000,
                 "discount_pct": 0,
+                "discount_amount": 0,
+                "taxable_amount": 1440000,
                 "tax_pct": 18,
+                "tax_amount": 259200,
+                "freight_amount": 0,
                 "line_total": 1440000,
-                "delivery_days": 7
+                "delivery_days": 7,
+                "item_warranty": "3 Years Onsite Warranty",
+                "technical_compliance": "Compliant"
             }
         ]
     },
@@ -225,8 +459,11 @@ INITIAL_QUOTATIONS = [
         "delivery_terms": "FOB Destination",
         "freight_terms": "Freight Prepaid",
         "warranty": "2 Years Standard",
+        "attachment": "Apex_Quote_Commercial.pdf",
+        "remarks": "Faster 5-day dispatch lead time.",
         "subtotal": 1254237.29,
         "tax_total": 225762.71,
+        "freight_total": 0,
         "total_landed_cost": 1480000,
         "status": "Received",
         "is_selected": False,
@@ -239,9 +476,15 @@ INITIAL_QUOTATIONS = [
                 "offered_quantity": 20,
                 "unit_rate": 74000,
                 "discount_pct": 0,
+                "discount_amount": 0,
+                "taxable_amount": 1480000,
                 "tax_pct": 18,
+                "tax_amount": 266400,
+                "freight_amount": 0,
                 "line_total": 1480000,
-                "delivery_days": 5
+                "delivery_days": 5,
+                "item_warranty": "2 Years Standard Warranty",
+                "technical_compliance": "Compliant"
             }
         ]
     }
@@ -254,35 +497,127 @@ def get_quotations():
         save_db()
     return {"success": True, "data": db["quotations"]}
 
+@router.get("/quotations/{qte_id}")
+def get_quotation(qte_id: str):
+    qte = next((q for q in db.get("quotations", []) if q["id"] == qte_id or q.get("quotation_number") == qte_id), None)
+    if qte:
+        return {"success": True, "data": qte}
+    return {"success": False, "message": "Quotation not found"}
+
 @router.post("/quotations")
 def create_quotation(payload: Dict[str, Any]):
-    new_id = f"qte-{len(db['quotations']) + 1}"
+    if not db.get("quotations"):
+        db["quotations"] = INITIAL_QUOTATIONS
+
+    # Perform mandatory backend calculations
+    calc = compute_quotation_totals(payload)
+
+    new_id = f"qte-{len(db['quotations']) + 1001}"
+    qtn_num = payload.get("quotation_number") or f"QTN-{datetime.now().year}-{str(len(db['quotations']) + 1001).zfill(6)}"
+    
     new_qte = {
         "id": new_id,
-        "quotation_number": payload.get("quotation_number") or f"QTN-2026-0000{len(db['quotations'])+1}",
-        "rfq_id": payload.get("rfq_id", "rfq-01"),
+        "quotation_number": qtn_num,
+        "rfq_id": payload.get("rfq_id", "rfq-1"),
+        "rfq_number": payload.get("rfq_number", "RFQ-2026-001001"),
         "supplier_id": payload.get("supplier_id", "sup-01"),
-        "supplier_name": payload.get("supplier_name", "Dell India Pvt Ltd"),
-        "total_landed_cost": payload.get("total_landed_cost", 72000),
-        "status": "Received",
+        "supplier_name": payload.get("supplier_name", "Supplier Name"),
+        "supplier_quotation_ref": payload.get("supplier_quotation_ref", "REF-001"),
+        "quotation_date": payload.get("quotation_date", datetime.now().strftime("%Y-%m-%d")),
+        "valid_until_date": payload.get("valid_until_date", datetime.now().strftime("%Y-%m-%d")),
+        "currency": payload.get("currency", "INR"),
+        "payment_terms": payload.get("payment_terms", "Net 30 days"),
+        "delivery_terms": payload.get("delivery_terms", "FOB Destination"),
+        "freight_terms": payload.get("freight_terms", "Freight Prepaid"),
+        "warranty": payload.get("warranty", "1 Year Standard"),
+        "attachment": payload.get("attachment", ""),
+        "remarks": payload.get("remarks", ""),
+        "subtotal": calc["subtotal"],
+        "tax_total": calc["tax_total"],
+        "freight_total": calc["freight_total"],
+        "total_landed_cost": calc["total_landed_cost"],
+        "status": payload.get("status", "Received"),
+        "is_selected": False,
+        "items": calc["items"],
         "created_at": datetime.now().isoformat()
     }
     db["quotations"].append(new_qte)
     save_db()
-    return {"success": True, "data": new_qte}
+    return {"success": True, "data": new_qte, "message": f"Quotation {qtn_num} created and calculated on backend."}
 
 @router.put("/quotations/{qte_id}")
 def update_quotation(qte_id: str, payload: Dict[str, Any]):
-    for q in db["quotations"]:
-        if q["id"] == qte_id:
-            q.update(payload)
+    for q in db.get("quotations", []):
+        if q["id"] == qte_id or q.get("quotation_number") == qte_id:
+            # Perform mandatory backend recalculation
+            calc = compute_quotation_totals(payload)
+            q.update({
+                "supplier_quotation_ref": payload.get("supplier_quotation_ref", q.get("supplier_quotation_ref")),
+                "quotation_date": payload.get("quotation_date", q.get("quotation_date")),
+                "valid_until_date": payload.get("valid_until_date", q.get("valid_until_date")),
+                "currency": payload.get("currency", q.get("currency")),
+                "payment_terms": payload.get("payment_terms", q.get("payment_terms")),
+                "delivery_terms": payload.get("delivery_terms", q.get("delivery_terms")),
+                "freight_terms": payload.get("freight_terms", q.get("freight_terms")),
+                "warranty": payload.get("warranty", q.get("warranty")),
+                "attachment": payload.get("attachment", q.get("attachment")),
+                "remarks": payload.get("remarks", q.get("remarks")),
+                "subtotal": calc["subtotal"],
+                "tax_total": calc["tax_total"],
+                "freight_total": calc["freight_total"],
+                "total_landed_cost": calc["total_landed_cost"],
+                "items": calc["items"],
+                "updated_at": datetime.now().isoformat()
+            })
             save_db()
-            return {"success": True, "data": q}
+            return {"success": True, "data": q, "message": f"Quotation {q.get('quotation_number')} recalculated and updated."}
     return {"success": False, "message": "Quotation not found"}
 
 @router.post("/quotation-comparisons/{rfq_id}/select")
 def select_winning_quotation(rfq_id: str, payload: Dict[str, Any]):
-    return {"success": True, "message": f"Quotation selected successfully for RFQ {rfq_id}."}
+    selected_qte_id = payload.get("selected_quotation_id") or payload.get("quotation_id")
+    justification = str(payload.get("justification_reason", payload.get("reason", ""))).strip()
+
+    q_list = [q for q in db.get("quotations", []) if q.get("rfq_id") == rfq_id or q.get("rfq_number") == rfq_id]
+    if not q_list:
+        q_list = db.get("quotations", [])
+
+    lowest_q = min(q_list, key=lambda x: float(x.get("total_landed_cost", 999999999))) if q_list else None
+    
+    # Important Rule Validation: If selected supplier is NOT the lowest bidder (L1), system MUST require a reason!
+    is_l1 = (lowest_q and (selected_qte_id == lowest_q.get("id") or selected_qte_id == lowest_q.get("quotation_number")))
+    if lowest_q and not is_l1:
+        if not justification:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="Non-L1 Selection Rule: Justification reason is mandatory when selecting a supplier with a higher bid than the lowest cost bidder (L1).")
+
+    # Mark selected quotation
+    for q in db.get("quotations", []):
+        if q["id"] == selected_qte_id or q.get("quotation_number") == selected_qte_id:
+            q["is_selected"] = True
+            q["status"] = "Approved"
+            q["selection_justification"] = justification
+        elif q.get("rfq_id") == rfq_id or q.get("rfq_number") == rfq_id:
+            q["is_selected"] = False
+            q["status"] = "Rejected"
+
+    # Store selection decision in quotation_selection_decisions table
+    if "quotation_selection_decisions" not in db:
+        db["quotation_selection_decisions"] = []
+
+    decision = {
+        "id": f"dec-{len(db['quotation_selection_decisions']) + 1}",
+        "rfq_id": rfq_id,
+        "selected_quotation_id": selected_qte_id,
+        "is_lowest_bidder": is_l1,
+        "justification_reason": justification,
+        "decided_by": payload.get("user_name", "Sarah Jenkins (Buyer)"),
+        "decided_at": datetime.now().isoformat()
+    }
+    db["quotation_selection_decisions"].append(decision)
+
+    save_db()
+    return {"success": True, "data": decision, "message": f"Supplier selection decision recorded successfully. (L1: {is_l1})"}
 
 # =========================================================================
 # PURCHASE ORDER MANAGEMENT

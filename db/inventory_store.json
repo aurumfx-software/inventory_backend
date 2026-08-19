@@ -507,6 +507,22 @@
       "rating": 4.5,
       "approval_status": "Approved",
       "is_active": true
+    },
+    {
+      "id": "sup-03",
+      "supplier_code": "SUP-00050",
+      "supplier_name": "ssddsdsds",
+      "contact_person": "",
+      "phone": "",
+      "email": "",
+      "address_registered": "",
+      "gst_number": "",
+      "pan_number": "",
+      "payment_terms": "Net 30 days",
+      "delivery_lead_time_days": 5,
+      "rating": 4.5,
+      "approval_status": "Approved",
+      "is_active": true
     }
   ],
   "supplier_contacts": [],
@@ -526,11 +542,418 @@
       "status": "Submitted",
       "total_estimated_amount": 1440000,
       "created_at": "2026-08-18T21:48:39.571703"
+    },
+    {
+      "id": "ind-1003",
+      "indent_number": "IND-2026-001002",
+      "request_date": "2026-08-19",
+      "department_id": "dept-01",
+      "requested_by": "usr-05",
+      "required_date": "2026-09-02",
+      "purpose": "New Department Equipment & Consumables Requisition",
+      "priority": "Normal",
+      "cost_centre": "IT-001",
+      "remarks": "",
+      "status": "Approved",
+      "total_estimated_amount": 150000,
+      "created_at": "2026-08-19T17:10:14.374192"
+    },
+    {
+      "id": "ind-1004",
+      "indent_number": "IND-2026-001003",
+      "request_date": "2026-08-19",
+      "department_id": "dept-01",
+      "requested_by": "usr-05",
+      "required_date": "2026-09-02",
+      "purpose": "New Department Equipment & Consumables Requisition",
+      "priority": "Normal",
+      "cost_centre": "IT-001",
+      "remarks": "",
+      "status": "Returned for Correction",
+      "total_estimated_amount": 150000,
+      "created_at": "2026-08-19T18:06:04.997910"
+    },
+    {
+      "id": "ind-1005",
+      "indent_number": "IND-2026-001004",
+      "request_date": "2026-08-19",
+      "department_id": "dept-01",
+      "requested_by": "usr-01",
+      "required_date": "2026-09-02",
+      "purpose": "New Department Equipment & Consumables Requisition",
+      "priority": "Normal",
+      "priority_justification": "",
+      "cost_centre_or_project": "IT-001",
+      "cost_centre": "IT-001",
+      "remarks": "",
+      "status": "Rejected",
+      "total_estimated_amount": 360000.0,
+      "items": [
+        {
+          "item_id": "itm-01",
+          "description": "Intel i7 13th Gen, 16GB RAM, 512GB SSD, 14-inch Display",
+          "requested_qty": 5,
+          "uom_id": "uom-01",
+          "approved_qty": 5,
+          "estimated_rate": 72000,
+          "estimated_amount": 360000,
+          "required_date": "2026-09-02",
+          "preferred_brand_id": "brd-01",
+          "suggested_supplier_id": "",
+          "technical_spec": "",
+          "attachment_name": "",
+          "line_remarks": ""
+        }
+      ],
+      "created_at": "2026-08-19T18:10:10.024808"
+    },
+    {
+      "id": "ind-1006",
+      "indent_number": "IND-2026-001005",
+      "request_date": "2026-08-19",
+      "department_id": "dept-01",
+      "requested_by": "usr-01",
+      "required_date": "2026-09-02",
+      "purpose": "New Department Equipment & Consumables Requisition",
+      "priority": "Normal",
+      "priority_justification": "",
+      "cost_centre_or_project": "IT-001",
+      "cost_centre": "IT-001",
+      "remarks": "",
+      "status": "Forward",
+      "total_estimated_amount": 360000.0,
+      "items": [
+        {
+          "item_id": "itm-01",
+          "description": "Intel i7 13th Gen, 16GB RAM, 512GB SSD, 14-inch Display",
+          "requested_qty": 5,
+          "uom_id": "uom-01",
+          "approved_qty": 5,
+          "estimated_rate": 72000,
+          "estimated_amount": 360000,
+          "required_date": "2026-09-02",
+          "preferred_brand_id": "brd-01",
+          "suggested_supplier_id": "",
+          "technical_spec": "",
+          "attachment_name": "",
+          "line_remarks": ""
+        }
+      ],
+      "created_at": "2026-08-19T18:10:43.182554"
+    },
+    {
+      "id": "ind-1007",
+      "indent_number": "IND-2026-001006",
+      "request_date": "2026-08-19",
+      "department_id": "dept-01",
+      "requested_by": "usr-01",
+      "required_date": "2026-09-02",
+      "purpose": "New Department Equipment & Consumables Requisition",
+      "priority": "Normal",
+      "priority_justification": "",
+      "cost_centre_or_project": "IT-001",
+      "cost_centre": "IT-001",
+      "remarks": "",
+      "status": "Partially fulfilled",
+      "total_estimated_amount": 360000.0,
+      "items": [
+        {
+          "item_id": "itm-01",
+          "description": "Intel i7 13th Gen, 16GB RAM, 512GB SSD, 14-inch Display",
+          "requested_qty": 5,
+          "uom_id": "uom-01",
+          "approved_qty": 5,
+          "estimated_rate": 72000,
+          "estimated_amount": 360000,
+          "required_date": "2026-09-02",
+          "preferred_brand_id": "brd-01",
+          "suggested_supplier_id": "",
+          "technical_spec": "",
+          "attachment_name": "",
+          "line_remarks": "",
+          "review_status": "Split Created",
+          "issue_from_stock_qty": 5.0,
+          "purchase_req_qty": 0.0,
+          "action_reason": ""
+        }
+      ],
+      "created_at": "2026-08-19T18:14:32.712938"
+    },
+    {
+      "id": "ind-1008",
+      "indent_number": "IND-2026-001007",
+      "request_date": "2026-08-19",
+      "department_id": "dept-01",
+      "requested_by": "usr-01",
+      "required_date": "2026-09-02",
+      "purpose": "New Department Equipment & Consumables Requisition",
+      "priority": "Normal",
+      "priority_justification": "",
+      "cost_centre_or_project": "IT-001",
+      "cost_centre": "IT-001",
+      "remarks": "",
+      "status": "Under review",
+      "total_estimated_amount": 360000.0,
+      "items": [
+        {
+          "item_id": "itm-01",
+          "description": "Intel i7 13th Gen, 16GB RAM, 512GB SSD, 14-inch Display",
+          "requested_qty": 5,
+          "uom_id": "uom-01",
+          "approved_qty": 5,
+          "estimated_rate": 72000,
+          "estimated_amount": 360000,
+          "required_date": "2026-09-02",
+          "preferred_brand_id": "brd-01",
+          "suggested_supplier_id": "",
+          "technical_spec": "",
+          "attachment_name": "",
+          "line_remarks": ""
+        }
+      ],
+      "created_at": "2026-08-19T18:14:57.326574"
+    },
+    {
+      "id": "ind-1009",
+      "indent_number": "IND-2026-001008",
+      "request_date": "2026-08-19",
+      "department_id": "dept-01",
+      "requested_by": "usr-01",
+      "required_date": "2026-09-02",
+      "purpose": "New Department Equipment & Consumables Requisition",
+      "priority": "Normal",
+      "priority_justification": "",
+      "cost_centre_or_project": "IT-001",
+      "cost_centre": "IT-001",
+      "remarks": "",
+      "status": "Under review",
+      "total_estimated_amount": 360000.0,
+      "items": [
+        {
+          "item_id": "itm-01",
+          "description": "Intel i7 13th Gen, 16GB RAM, 512GB SSD, 14-inch Display",
+          "requested_qty": 5,
+          "uom_id": "uom-01",
+          "approved_qty": 5,
+          "estimated_rate": 72000,
+          "estimated_amount": 360000,
+          "required_date": "2026-09-02",
+          "preferred_brand_id": "brd-01",
+          "suggested_supplier_id": "",
+          "technical_spec": "",
+          "attachment_name": "",
+          "line_remarks": ""
+        }
+      ],
+      "created_at": "2026-08-19T18:15:02.823089"
+    },
+    {
+      "id": "ind-1010",
+      "indent_number": "IND-2026-001009",
+      "request_date": "2026-08-19",
+      "department_id": "dept-01",
+      "requested_by": "usr-01",
+      "required_date": "2026-09-02",
+      "purpose": "New Department Equipment & Consumables Requisition",
+      "priority": "Normal",
+      "priority_justification": "",
+      "cost_centre_or_project": "IT-001",
+      "cost_centre": "IT-001",
+      "remarks": "",
+      "status": "Under review",
+      "total_estimated_amount": 360000.0,
+      "items": [
+        {
+          "item_id": "itm-01",
+          "description": "Intel i7 13th Gen, 16GB RAM, 512GB SSD, 14-inch Display",
+          "requested_qty": 5,
+          "uom_id": "uom-01",
+          "approved_qty": 5,
+          "estimated_rate": 72000,
+          "estimated_amount": 360000,
+          "required_date": "2026-09-02",
+          "preferred_brand_id": "brd-01",
+          "suggested_supplier_id": "",
+          "technical_spec": "",
+          "attachment_name": "",
+          "line_remarks": ""
+        }
+      ],
+      "created_at": "2026-08-19T18:15:37.598528"
+    },
+    {
+      "id": "ind-1011",
+      "indent_number": "IND-2026-001010",
+      "request_date": "2026-08-19",
+      "department_id": "dept-01",
+      "requested_by": "usr-01",
+      "required_date": "2026-09-02",
+      "purpose": "New Department Equipment & Consumables Requisition",
+      "priority": "Normal",
+      "priority_justification": "",
+      "cost_centre_or_project": "IT-001",
+      "cost_centre": "IT-001",
+      "remarks": "",
+      "status": "Under review",
+      "total_estimated_amount": 360000.0,
+      "items": [
+        {
+          "item_id": "itm-01",
+          "description": "Intel i7 13th Gen, 16GB RAM, 512GB SSD, 14-inch Display",
+          "requested_qty": 5,
+          "uom_id": "uom-01",
+          "approved_qty": 5,
+          "estimated_rate": 72000,
+          "estimated_amount": 360000,
+          "required_date": "2026-09-02",
+          "preferred_brand_id": "brd-01",
+          "suggested_supplier_id": "",
+          "technical_spec": "",
+          "attachment_name": "",
+          "line_remarks": ""
+        }
+      ],
+      "created_at": "2026-08-19T18:15:58.991026"
+    },
+    {
+      "id": "ind-1012",
+      "indent_number": "IND-2026-001011",
+      "request_date": "2026-08-19",
+      "department_id": "dept-01",
+      "requested_by": "usr-01",
+      "required_date": "2026-09-02",
+      "purpose": "New Department Equipment & Consumables Requisition",
+      "priority": "Normal",
+      "priority_justification": "",
+      "cost_centre_or_project": "IT-001",
+      "cost_centre": "IT-001",
+      "remarks": "",
+      "status": "Under review",
+      "total_estimated_amount": 360000.0,
+      "items": [
+        {
+          "item_id": "itm-01",
+          "description": "Intel i7 13th Gen, 16GB RAM, 512GB SSD, 14-inch Display",
+          "requested_qty": 5,
+          "uom_id": "uom-01",
+          "approved_qty": 5,
+          "estimated_rate": 72000,
+          "estimated_amount": 360000,
+          "required_date": "2026-09-02",
+          "preferred_brand_id": "brd-01",
+          "suggested_supplier_id": "",
+          "technical_spec": "",
+          "attachment_name": "",
+          "line_remarks": ""
+        }
+      ],
+      "created_at": "2026-08-19T18:16:10.479372"
     }
   ],
   "indent_items": [],
   "approval_workflows": [],
-  "approval_requests": [],
+  "approval_requests": [
+    {
+      "id": "app-1",
+      "transaction_type": "INDENT",
+      "transaction_id": "ind-1003",
+      "approval_level": 1,
+      "approver_id": "usr-04",
+      "assigned_date": "2026-08-19T17:10:14.374192",
+      "status": "Approved",
+      "comments": "k\n"
+    },
+    {
+      "id": "app-2",
+      "transaction_type": "INDENT",
+      "transaction_id": "ind-1004",
+      "approval_level": 1,
+      "approver_id": "usr-04",
+      "assigned_date": "2026-08-19T18:06:04.997910",
+      "status": "Returned for Correction",
+      "comments": "m"
+    },
+    {
+      "id": "app-3",
+      "transaction_type": "INDENT",
+      "transaction_id": "ind-1005",
+      "approval_level": 1,
+      "approver_id": "usr-04",
+      "assigned_date": "2026-08-19T18:10:10.024808",
+      "status": "Rejected",
+      "comments": "m"
+    },
+    {
+      "id": "app-4",
+      "transaction_type": "INDENT",
+      "transaction_id": "ind-1006",
+      "approval_level": 1,
+      "approver_id": "usr-04",
+      "assigned_date": "2026-08-19T18:10:43.182554",
+      "status": "Forward",
+      "comments": ""
+    },
+    {
+      "id": "app-5",
+      "transaction_type": "INDENT",
+      "transaction_id": "ind-1007",
+      "approval_level": 1,
+      "approver_id": "usr-04",
+      "assigned_date": "2026-08-19T18:14:32.712938",
+      "status": "Pending",
+      "comments": ""
+    },
+    {
+      "id": "app-6",
+      "transaction_type": "INDENT",
+      "transaction_id": "ind-1008",
+      "approval_level": 1,
+      "approver_id": "usr-04",
+      "assigned_date": "2026-08-19T18:14:57.326574",
+      "status": "Pending",
+      "comments": ""
+    },
+    {
+      "id": "app-7",
+      "transaction_type": "INDENT",
+      "transaction_id": "ind-1009",
+      "approval_level": 1,
+      "approver_id": "usr-04",
+      "assigned_date": "2026-08-19T18:15:02.823089",
+      "status": "Pending",
+      "comments": ""
+    },
+    {
+      "id": "app-8",
+      "transaction_type": "INDENT",
+      "transaction_id": "ind-1010",
+      "approval_level": 1,
+      "approver_id": "usr-04",
+      "assigned_date": "2026-08-19T18:15:37.598528",
+      "status": "Pending",
+      "comments": ""
+    },
+    {
+      "id": "app-9",
+      "transaction_type": "INDENT",
+      "transaction_id": "ind-1011",
+      "approval_level": 1,
+      "approver_id": "usr-04",
+      "assigned_date": "2026-08-19T18:15:58.991026",
+      "status": "Pending",
+      "comments": ""
+    },
+    {
+      "id": "app-10",
+      "transaction_type": "INDENT",
+      "transaction_id": "ind-1012",
+      "approval_level": 1,
+      "approver_id": "usr-04",
+      "assigned_date": "2026-08-19T18:16:10.479372",
+      "status": "Pending",
+      "comments": ""
+    }
+  ],
   "rfqs": [
     {
       "id": "rfq-1",
@@ -583,6 +1006,27 @@
           "required_delivery_date": "2026-08-28"
         }
       ]
+    },
+    {
+      "id": "rfq-1003",
+      "rfq_number": "RFQ-2026-001003",
+      "indent_id": "ind-1007",
+      "indent_number": "IND-2026-001006",
+      "item_id": "itm-01",
+      "item_name": "Dell Latitude 5440 Laptop",
+      "required_qty": 5.0,
+      "target_date": "2026-09-02",
+      "status": "Closed",
+      "created_at": "2026-08-19T18:21:13.185689"
+    },
+    {
+      "id": "rfq-4",
+      "rfq_number": "RFQ-2026-002002",
+      "rfq_date": "2026-08-19",
+      "indent_id": "ind-1001",
+      "status": "Published",
+      "due_date": "2026-08-28",
+      "created_at": "2026-08-19T18:24:53.413621"
     }
   ],
   "rfq_items": [],
@@ -657,6 +1101,54 @@
           "delivery_days": 5
         }
       ]
+    },
+    {
+      "id": "qte-1003",
+      "quotation_number": "QTN-2026-001003",
+      "rfq_id": "rfq-1",
+      "rfq_number": "RFQ-2026-001001",
+      "supplier_id": "sup-01",
+      "supplier_name": "Supplier Name",
+      "supplier_quotation_ref": "REF-001",
+      "quotation_date": "2026-08-19",
+      "valid_until_date": "2026-08-19",
+      "currency": "INR",
+      "payment_terms": "Net 30 Days",
+      "delivery_terms": "Door Delivery",
+      "freight_terms": "Freight Prepaid / FOB Destination",
+      "warranty": "1 Year Standard Manufacturer Warranty",
+      "attachment": null,
+      "remarks": "",
+      "subtotal": 100000.0,
+      "tax_total": 18000.0,
+      "freight_total": 0.0,
+      "total_landed_cost": 118000.0,
+      "status": "Received",
+      "is_selected": false,
+      "items": [
+        {
+          "id": "qti-1",
+          "rfq_item_id": null,
+          "item_id": "itm-01",
+          "item_code": "ITM-01",
+          "item_name": "Material Item",
+          "offered_brand": "Standard Brand",
+          "offered_quantity": 20.0,
+          "unit_rate": 5000.0,
+          "discount_pct": 0.0,
+          "discount_amount": 0.0,
+          "taxable_amount": 100000.0,
+          "tax_pct": 18.0,
+          "tax_amount": 18000.0,
+          "freight_amount": 0.0,
+          "line_total": 118000.0,
+          "delivery_days": 7,
+          "item_warranty": "1 Year",
+          "technical_compliance": "Fully Compliant",
+          "supplier_remarks": ""
+        }
+      ],
+      "created_at": "2026-08-19T18:42:49.896906"
     }
   ],
   "quotation_items": [],
@@ -1005,6 +1497,27 @@
       "unit_rate": 0.0,
       "total_value": 0.0,
       "created_at": "2026-08-18T22:28:50.848167"
+    },
+    {
+      "id": "ledg-4",
+      "posting_date": "2026-08-19",
+      "transaction_date": "2026-08-19",
+      "transaction_type": "Stock Issue (-)",
+      "voucher_type": "Stock Issue",
+      "reference_number": "ISS-2026-005002",
+      "voucher_no": "ISS-2026-005002",
+      "item_id": "itm-02",
+      "item_code": "ELE-CBL-0002",
+      "item_name": "Cat6 Ethernet Cable (305m Drum)",
+      "warehouse_id": "wh-01",
+      "location_id": "loc-01",
+      "batch_number": "",
+      "serial_number": "",
+      "qty_in": 0,
+      "qty_out": 2.0,
+      "unit_rate": 0.0,
+      "total_value": 0.0,
+      "created_at": "2026-08-19T17:10:06.133317"
     }
   ],
   "inventory_balances": [
@@ -1049,7 +1562,101 @@
       "valuation_rate": 350
     }
   ],
-  "stock_issues": [],
+  "stock_issues": [
+    {
+      "id": "iss-1",
+      "issue_number": "ISS-2026-005002",
+      "issue_date": "2026-08-19",
+      "department_id": "dept-01",
+      "department_name": "Information Technology",
+      "issued_to": "usr-05",
+      "issued_by": "Sarah Jenkins",
+      "warehouse_id": "wh-01",
+      "warehouse_name": "Central Goods Warehouse",
+      "indent_ref": "IND-2026-000123",
+      "cost_centre": "CC-ENGINEERING",
+      "project": "PROJ-ALPHA",
+      "purpose": "Routine Equipment Maintenance",
+      "remarks": "Approved for store issue",
+      "issue_type": "Consumable issue",
+      "status": "Posted",
+      "items": [
+        {
+          "id": "issi-1-1",
+          "item_id": "itm-02",
+          "item_code": "ELE-CBL-0002",
+          "item_name": "Cat6 Ethernet Cable (305m Drum)",
+          "requested_qty": 2.0,
+          "approved_qty": 2.0,
+          "issue_qty": 2.0,
+          "unit": "Pcs",
+          "unit_rate": 0.0,
+          "batch_number": "",
+          "serial_number": "",
+          "storage_location_id": "loc-01",
+          "condition": "Good",
+          "line_total": 0.0
+        }
+      ],
+      "created_at": "2026-08-19T17:10:06.133262"
+    },
+    {
+      "id": "iss-1002",
+      "issue_number": "ISS-2026-001002",
+      "indent_id": "ind-1007",
+      "indent_number": "IND-2026-001006",
+      "department_id": "dept-01",
+      "item_id": "itm-01",
+      "item_name": "Dell Latitude 5440 Laptop",
+      "requested_qty": 5,
+      "issued_qty": 5.0,
+      "warehouse_id": "wh-01",
+      "status": "Approved for Issue",
+      "created_at": "2026-08-19T18:19:50.611170"
+    },
+    {
+      "id": "iss-1003",
+      "issue_number": "ISS-2026-001003",
+      "indent_id": "ind-1007",
+      "indent_number": "IND-2026-001006",
+      "department_id": "dept-01",
+      "item_id": "itm-01",
+      "item_name": "Dell Latitude 5440 Laptop",
+      "requested_qty": 5,
+      "issued_qty": 5.0,
+      "warehouse_id": "wh-01",
+      "status": "Approved for Issue",
+      "created_at": "2026-08-19T18:20:05.388084"
+    },
+    {
+      "id": "iss-1004",
+      "issue_number": "ISS-2026-001004",
+      "indent_id": "ind-1007",
+      "indent_number": "IND-2026-001006",
+      "department_id": "dept-01",
+      "item_id": "itm-01",
+      "item_name": "Dell Latitude 5440 Laptop",
+      "requested_qty": 5,
+      "issued_qty": 5.0,
+      "warehouse_id": "wh-01",
+      "status": "Approved for Issue",
+      "created_at": "2026-08-19T18:20:15.851963"
+    },
+    {
+      "id": "iss-1005",
+      "issue_number": "ISS-2026-001005",
+      "indent_id": "ind-1007",
+      "indent_number": "IND-2026-001006",
+      "department_id": "dept-01",
+      "item_id": "itm-01",
+      "item_name": "Dell Latitude 5440 Laptop",
+      "requested_qty": 5,
+      "issued_qty": 5.0,
+      "warehouse_id": "wh-01",
+      "status": "Approved for Issue",
+      "created_at": "2026-08-19T18:22:22.017220"
+    }
+  ],
   "stock_issue_items": [],
   "stock_returns": [],
   "supplier_returns": [],
@@ -1198,6 +1805,176 @@
       "record_id": "N/A",
       "ip_address": "127.0.0.1",
       "details": "Added Purchase Orders charge: Dell Latitude 5440 Laptop (Qty: 1, ₹72000)"
+    },
+    {
+      "id": "aud-4",
+      "user_id": "usr-05",
+      "action": "CREATE_INDENT",
+      "module": "PROCUREMENT",
+      "record_id": "ind-1003",
+      "details": "Created Indent Requisition IND-2026-001002",
+      "timestamp": "2026-08-19T17:10:14.374192",
+      "ip_address": "127.0.0.1"
+    },
+    {
+      "id": "aud-5",
+      "user_id": "usr-05",
+      "action": "CREATE_INDENT",
+      "module": "PROCUREMENT",
+      "record_id": "ind-1004",
+      "details": "Created Indent Requisition IND-2026-001003",
+      "timestamp": "2026-08-19T18:06:04.997910",
+      "ip_address": "127.0.0.1"
+    },
+    {
+      "id": "aud-6",
+      "user_id": "usr-01",
+      "action": "INDENT_STATUS_UNDER_REVIEW",
+      "module": "PROCUREMENT",
+      "record_id": "ind-1001",
+      "details": "Transitioned Indent IND-2026-001001 status to 'Under review'. Reason: ",
+      "timestamp": "2026-08-19T18:09:58.946699",
+      "ip_address": "127.0.0.1"
+    },
+    {
+      "id": "aud-7",
+      "user_id": "usr-05",
+      "action": "INDENT_SUBMITTED",
+      "module": "PROCUREMENT",
+      "record_id": "ind-1001",
+      "details": "Submitted Indent Requisition IND-2026-001001",
+      "timestamp": "2026-08-19T18:10:01.756840",
+      "ip_address": "127.0.0.1"
+    },
+    {
+      "id": "aud-8",
+      "user_id": "usr-01",
+      "action": "INDENT_DRAFT_CREATED",
+      "module": "PROCUREMENT",
+      "record_id": "ind-1005",
+      "details": "Created Indent Requisition IND-2026-001004 with Cost Centre/Project IT-001",
+      "timestamp": "2026-08-19T18:10:10.024808",
+      "ip_address": "127.0.0.1"
+    },
+    {
+      "id": "aud-9",
+      "user_id": "usr-01",
+      "action": "INDENT_DRAFT_CREATED",
+      "module": "PROCUREMENT",
+      "record_id": "ind-1006",
+      "details": "Created Indent Requisition IND-2026-001005 with Cost Centre/Project IT-001",
+      "timestamp": "2026-08-19T18:10:43.182554",
+      "ip_address": "127.0.0.1"
+    },
+    {
+      "id": "aud-10",
+      "user_id": "usr-01",
+      "action": "INDENT_DRAFT_CREATED",
+      "module": "PROCUREMENT",
+      "record_id": "ind-1007",
+      "details": "Created Indent Requisition IND-2026-001006 with Cost Centre/Project IT-001",
+      "timestamp": "2026-08-19T18:14:32.712938",
+      "ip_address": "127.0.0.1"
+    },
+    {
+      "id": "aud-11",
+      "user_id": "usr-01",
+      "action": "INDENT_DRAFT_CREATED",
+      "module": "PROCUREMENT",
+      "record_id": "ind-1008",
+      "details": "Created Indent Requisition IND-2026-001007 with Cost Centre/Project IT-001",
+      "timestamp": "2026-08-19T18:14:57.326574",
+      "ip_address": "127.0.0.1"
+    },
+    {
+      "id": "aud-12",
+      "user_id": "usr-01",
+      "action": "INDENT_DRAFT_CREATED",
+      "module": "PROCUREMENT",
+      "record_id": "ind-1009",
+      "details": "Created Indent Requisition IND-2026-001008 with Cost Centre/Project IT-001",
+      "timestamp": "2026-08-19T18:15:02.823089",
+      "ip_address": "127.0.0.1"
+    },
+    {
+      "id": "aud-13",
+      "user_id": "usr-01",
+      "action": "INDENT_DRAFT_CREATED",
+      "module": "PROCUREMENT",
+      "record_id": "ind-1010",
+      "details": "Created Indent Requisition IND-2026-001009 with Cost Centre/Project IT-001",
+      "timestamp": "2026-08-19T18:15:37.598528",
+      "ip_address": "127.0.0.1"
+    },
+    {
+      "id": "aud-14",
+      "user_id": "usr-01",
+      "action": "INDENT_DRAFT_CREATED",
+      "module": "PROCUREMENT",
+      "record_id": "ind-1011",
+      "details": "Created Indent Requisition IND-2026-001010 with Cost Centre/Project IT-001",
+      "timestamp": "2026-08-19T18:15:58.991026",
+      "ip_address": "127.0.0.1"
+    },
+    {
+      "id": "aud-15",
+      "user_id": "usr-01",
+      "action": "INDENT_DRAFT_CREATED",
+      "module": "PROCUREMENT",
+      "record_id": "ind-1012",
+      "details": "Created Indent Requisition IND-2026-001011 with Cost Centre/Project IT-001",
+      "timestamp": "2026-08-19T18:16:10.479372",
+      "ip_address": "127.0.0.1"
+    },
+    {
+      "id": "aud-16",
+      "user_id": "usr-01",
+      "action": "STOCK_AVAILABILITY_REVIEW",
+      "module": "INVENTORY_STORE",
+      "record_id": "ind-1007",
+      "details": "Stock review action 'partial' executed for item Dell Latitude 5440 Laptop. Issued from stock: 5.0, Purchase required: 0.0.",
+      "timestamp": "2026-08-19T18:19:50.611170",
+      "ip_address": "127.0.0.1"
+    },
+    {
+      "id": "aud-17",
+      "user_id": "usr-01",
+      "action": "STOCK_AVAILABILITY_REVIEW",
+      "module": "INVENTORY_STORE",
+      "record_id": "ind-1007",
+      "details": "Stock review action 'partial' executed for item Dell Latitude 5440 Laptop. Issued from stock: 5.0, Purchase required: 0.0.",
+      "timestamp": "2026-08-19T18:20:05.388084",
+      "ip_address": "127.0.0.1"
+    },
+    {
+      "id": "aud-18",
+      "user_id": "usr-01",
+      "action": "STOCK_AVAILABILITY_REVIEW",
+      "module": "INVENTORY_STORE",
+      "record_id": "ind-1007",
+      "details": "Stock review action 'partial' executed for item Dell Latitude 5440 Laptop. Issued from stock: 5.0, Purchase required: 0.0.",
+      "timestamp": "2026-08-19T18:20:15.851963",
+      "ip_address": "127.0.0.1"
+    },
+    {
+      "id": "aud-19",
+      "user_id": "usr-01",
+      "action": "STOCK_AVAILABILITY_REVIEW",
+      "module": "INVENTORY_STORE",
+      "record_id": "ind-1007",
+      "details": "Stock review action 'purchase-full' executed for item Dell Latitude 5440 Laptop. Issued from stock: 0.0, Purchase required: 5.0.",
+      "timestamp": "2026-08-19T18:21:13.185689",
+      "ip_address": "127.0.0.1"
+    },
+    {
+      "id": "aud-20",
+      "user_id": "usr-01",
+      "action": "STOCK_AVAILABILITY_REVIEW",
+      "module": "INVENTORY_STORE",
+      "record_id": "ind-1007",
+      "details": "Stock review action 'partial' executed for item Dell Latitude 5440 Laptop. Issued from stock: 5.0, Purchase required: 0.0.",
+      "timestamp": "2026-08-19T18:22:22.017220",
+      "ip_address": "127.0.0.1"
     }
   ],
   "settings": {
@@ -1214,11 +1991,11 @@
     "decimal_precision_qty": 2,
     "decimal_precision_currency": 2,
     "numbering_series": {
-      "IND": 1001,
-      "RFQ": 2001,
+      "IND": 1011,
+      "RFQ": 2002,
       "PO": 3003,
       "GRN": 4001,
-      "ISS": 5001,
+      "ISS": 5002,
       "TRN": 6001,
       "ADJ": 7001
     }

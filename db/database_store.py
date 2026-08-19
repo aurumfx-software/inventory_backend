@@ -344,17 +344,242 @@ def seed_initial_data():
         {
             "id": "ind-1001",
             "indent_number": "IND-2026-001001",
-            "request_date": "2026-08-08",
+            "request_date": "2026-08-18",
             "department_id": "dept-01",
             "requested_by": "usr-05",
-            "required_date": "2026-08-25",
+            "required_date": "2026-08-30",
             "purpose": "New Developer Onboarding Setup",
             "priority": "High",
+            "cost_centre_or_project": "IT-001",
             "cost_centre": "IT-001",
             "remarks": "Urgent laptops for new engineering team hires",
             "status": "Submitted",
             "total_estimated_amount": 1440000,
+            "items": [
+                {"id": "ind-item-1", "item_id": "itm-01", "item_code": "IT-LAP-0001", "item_name": "Dell Latitude 5440 Laptop", "requested_qty": 20, "approved_qty": 20, "estimated_rate": 72000, "estimated_amount": 1440000, "required_date": "2026-08-30"}
+            ],
             "created_at": now
+        },
+        {
+            "id": "ind-1002",
+            "indent_number": "IND-2026-001002",
+            "request_date": "2026-08-17",
+            "department_id": "dept-02",
+            "requested_by": "usr-03",
+            "required_date": "2026-08-28",
+            "purpose": "Plant Floor Maintenance Spares",
+            "priority": "Normal",
+            "cost_centre_or_project": "MAINT-002",
+            "cost_centre": "MAINT-002",
+            "remarks": "Routine cabling and maintenance materials",
+            "status": "Submitted",
+            "total_estimated_amount": 180000,
+            "items": [
+                {"id": "ind-item-2", "item_id": "itm-02", "item_code": "ELE-CBL-0002", "item_name": "Cat6 Ethernet Cable (305m Drum)", "requested_qty": 4, "approved_qty": 4, "estimated_rate": 45000, "estimated_amount": 180000, "required_date": "2026-08-28"}
+            ],
+            "created_at": now
+        },
+        {
+            "id": "ind-1003",
+            "indent_number": "IND-2026-001003",
+            "request_date": "2026-08-15",
+            "department_id": "dept-01",
+            "requested_by": "usr-05",
+            "required_date": "2026-08-26",
+            "purpose": "Office Supplies & Printing Paper",
+            "priority": "Low",
+            "cost_centre_or_project": "IT-001",
+            "cost_centre": "IT-001",
+            "remarks": "Quarterly stationery replenishment",
+            "status": "Approved",
+            "total_estimated_amount": 28000,
+            "items": [
+                {"id": "ind-item-3", "item_id": "itm-03", "item_code": "OFF-PPR-0003", "item_name": "A4 Copy Paper 80GSM (Rim)", "requested_qty": 100, "approved_qty": 100, "estimated_rate": 280, "estimated_amount": 28000, "required_date": "2026-08-26"}
+            ],
+            "created_at": now
+        },
+        {
+            "id": "ind-1004",
+            "indent_number": "IND-2026-001004",
+            "request_date": "2026-08-14",
+            "department_id": "dept-02",
+            "requested_by": "usr-03",
+            "required_date": "2026-08-24",
+            "purpose": "Chemical Cleaning Solvents Batch C-40",
+            "priority": "Normal",
+            "cost_centre_or_project": "MAINT-002",
+            "cost_centre": "MAINT-002",
+            "remarks": "Specify brand preferences before approval",
+            "status": "Returned for correction",
+            "total_estimated_amount": 70000,
+            "items": [
+                {"id": "ind-item-4", "item_id": "itm-04", "item_code": "RAW-CHM-0004", "item_name": "Industrial Cleaning Solvent C-40", "requested_qty": 200, "approved_qty": 200, "estimated_rate": 350, "estimated_amount": 70000, "required_date": "2026-08-24"}
+            ],
+            "created_at": now
+        },
+        {
+            "id": "ind-1005",
+            "indent_number": "IND-2026-001005",
+            "request_date": "2026-08-12",
+            "department_id": "dept-03",
+            "requested_by": "usr-02",
+            "required_date": "2026-08-20",
+            "purpose": "Unbudgeted Executive High End Hardware",
+            "priority": "Urgent",
+            "priority_justification": "Executive request",
+            "cost_centre_or_project": "PROD-003",
+            "cost_centre": "PROD-003",
+            "remarks": "Exceeds annual department budget limits",
+            "status": "Rejected",
+            "total_estimated_amount": 850000,
+            "items": [
+                {"id": "ind-item-5", "item_id": "itm-01", "item_code": "IT-LAP-0001", "item_name": "Dell Latitude 5440 Laptop", "requested_qty": 10, "approved_qty": 0, "estimated_rate": 85000, "estimated_amount": 850000, "required_date": "2026-08-20"}
+            ],
+            "created_at": now
+        }
+    ]
+
+    db["purchase_orders"] = [
+        {
+            "id": "po-1001",
+            "po_number": "PO-2026-001001",
+            "supplier_id": "sup-01",
+            "supplier_name": "Infotech Systems Ltd",
+            "po_date": "2026-08-17",
+            "delivery_date": "2026-08-28",
+            "status": "Submitted",
+            "grand_total": 360000,
+            "payment_terms": "Net 30 days",
+            "items": [
+                {"id": "po-item-1", "item_id": "itm-01", "item_code": "IT-LAP-0001", "item_name": "Dell Latitude 5440 Laptop", "order_qty": 5, "unit_price": 72000, "total_price": 360000}
+            ],
+            "created_at": now
+        }
+    ]
+
+    db["approval_workflows"] = [
+        {
+            "id": "wf-01",
+            "name": "Standard High Value Indent Approval Matrix",
+            "transaction_type": "INDENT",
+            "department_id": "ALL",
+            "branch_id": "ALL",
+            "item_category_id": "ALL",
+            "min_amount": 0,
+            "max_amount": None,
+            "urgency": "ALL",
+            "steps": [
+                {"step_number": 1, "step_name": "Department Manager Approval", "approver_role_id": "role-dept-mgr", "min_amount": 0, "can_change_qty": True, "can_approve_lines": True},
+                {"step_number": 2, "step_name": "Store Manager Stock Check", "approver_role_id": "role-store", "min_amount": 0, "can_change_qty": True, "can_approve_lines": True},
+                {"step_number": 3, "step_name": "Purchase Manager Review", "approver_role_id": "role-purchase", "min_amount": 0, "can_change_qty": True, "can_approve_lines": True},
+                {"step_number": 4, "step_name": "Finance Manager Sign-off (> ₹100,000)", "approver_role_id": "role-finance", "min_amount": 100000, "can_change_qty": False, "can_approve_lines": True},
+                {"step_number": 5, "step_name": "Director Approval (> ₹500,000)", "approver_role_id": "role-admin", "min_amount": 500000, "can_change_qty": False, "can_approve_lines": True}
+            ]
+        },
+        {
+            "id": "wf-02",
+            "name": "Purchase Order Authorization Matrix",
+            "transaction_type": "PURCHASE_ORDER",
+            "department_id": "ALL",
+            "branch_id": "ALL",
+            "item_category_id": "ALL",
+            "min_amount": 0,
+            "max_amount": None,
+            "urgency": "ALL",
+            "steps": [
+                {"step_number": 1, "step_name": "Purchase Officer Review", "approver_role_id": "role-purchase", "min_amount": 0, "can_change_qty": True, "can_approve_lines": True},
+                {"step_number": 2, "step_name": "Finance Manager Sign-off", "approver_role_id": "role-finance", "min_amount": 100000, "can_change_qty": False, "can_approve_lines": True},
+                {"step_number": 3, "step_name": "Managing Director Sign-off", "approver_role_id": "role-admin", "min_amount": 500000, "can_change_qty": False, "can_approve_lines": True}
+            ]
+        }
+    ]
+
+    db["approval_requests"] = [
+        {
+            "id": "app-01",
+            "transaction_type": "INDENT",
+            "transaction_id": "ind-1001",
+            "approval_level": 1,
+            "approver_id": "usr-04",
+            "assigned_date": "2026-08-18T10:00:00",
+            "status": "Pending",
+            "comments": "Awaiting Department Manager Approval"
+        },
+        {
+            "id": "app-02",
+            "transaction_type": "PURCHASE_ORDER",
+            "transaction_id": "po-1001",
+            "approval_level": 2,
+            "approver_id": "usr-04",
+            "assigned_date": "2026-08-17T14:30:00",
+            "status": "Pending",
+            "comments": "Awaiting Finance Manager sign-off for PO-2026-001001"
+        },
+        {
+            "id": "app-03",
+            "transaction_type": "INDENT",
+            "transaction_id": "ind-1002",
+            "approval_level": 1,
+            "approver_id": "usr-04",
+            "assigned_date": "2026-08-17T11:00:00",
+            "status": "Pending",
+            "comments": "Awaiting Department Manager Stock Review for cabling"
+        }
+    ]
+
+    db["approval_delegations"] = [
+        {
+            "id": "del-01",
+            "delegator_id": "usr-04",
+            "delegator_name": "Sarah Jenkins",
+            "delegatee_id": "usr-02",
+            "delegatee_name": "Jane Smith",
+            "from_user": "usr-04",
+            "to_user": "usr-02",
+            "start_date": "2026-08-15",
+            "end_date": "2026-08-31",
+            "reason": "Annual Vacation Approval Delegation",
+            "status": "Active",
+            "is_active": True
+        }
+    ]
+
+    db["approval_actions"] = [
+        {
+            "id": "act-01",
+            "approval_id": "app-03-hist",
+            "transaction_type": "INDENT",
+            "transaction_id": "ind-1003",
+            "approver_id": "usr-04",
+            "approver_name": "Sarah Jenkins",
+            "action": "Approve",
+            "status": "Approved",
+            "comments": "Approved IT hardware requisition for developer team setup.",
+            "timestamp": "2026-08-15T10:30:00"
+        },
+        {
+            "id": "act-02",
+            "approval_id": "app-04-hist",
+            "transaction_type": "INDENT",
+            "transaction_id": "ind-1004",
+            "approver_id": "usr-04",
+            "approver_name": "Sarah Jenkins",
+            "action": "Return",
+            "status": "Returned for Correction",
+            "comments": "Please specify preferred brand and technical specifications for cabling drums.",
+            "timestamp": "2026-08-14T12:00:00"
+        },
+        {
+            "id": "act-03",
+            "approval_id": "app-05-hist",
+            "transaction_type": "INDENT",
+            "transaction_id": "ind-1005",
+            "approver_id": "usr-04",
+            "approver_name": "Sarah Jenkins",
+            "action": "Reject",
+            "status": "Rejected",
+            "comments": "Exceeds annual department budget limits without senior management authorization.",
+            "timestamp": "2026-08-12T16:15:00"
         }
     ]
 

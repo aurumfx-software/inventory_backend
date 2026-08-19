@@ -239,40 +239,176 @@ def delete_supplier(supplier_id: str):
     return {"success": False, "message": "Supplier not found"}
 
 # =========================================================================
-# DEPARTMENTS, WAREHOUSES, LOCATIONS, USERS & PERMISSIONS
+# DEPARTMENTS, COST CENTRES, BUDGETS, APPROVERS & WAREHOUSES
 # =========================================================================
 @router.get("/departments")
 def get_departments():
     return {"success": True, "data": db["departments"]}
 
+@router.get("/departments/{dept_id}")
+def get_department_by_id(dept_id: str):
+    target = unquote(dept_id).strip().lower()
+    dept = next((d for d in db["departments"] if str(d.get("id", "")).lower() == target or str(d.get("code", "")).lower() == target), None)
+    if dept:
+        return {"success": True, "data": dept}
+    return {"success": False, "message": "Department not found"}
+
 @router.get("/departments/{dept_id}/budget")
 def get_department_budget(dept_id: str):
-    dept = next((d for d in db["departments"] if d["id"] == dept_id), {})
-    return {"success": True, "data": {"annual_budget": dept.get("budget_annual", 1500000), "utilized": 450000, "remaining": 1050000}}
+    target = unquote(dept_id).strip().lower()
+    dept = next((d for d in db["departments"] if str(d.get("id", "")).lower() == target or str(d.get("code", "")).lower() == target), {})
+    annual = float(dept.get("budget_annual", 2400000))
+    monthly = float(dept.get("budget_monthly", annual / 12))
+    quarterly = float(dept.get("budget_quarterly", annual / 4))
+    consumed = float(dept.get("ytd_consumption", 1850000))
+    remaining = max(0, annual - consumed)
+    
+    return {
+        "success": True,
+        "data": {
+            "department_id": dept.get("id"),
+            "department_name": dept.get("name"),
+            "cost_centre": dept.get("cost_centre", "IT-001"),
+            "budget_monthly": monthly,
+            "budget_quarterly": quarterly,
+            "budget_annual": annual,
+            "category_budgets": dept.get("category_budgets", {
+                "cat-01": 1200000,
+                "cat-02": 500000,
+                "cat-03": 400000,
+                "cat-04": 300000
+            }),
+            "budget_control_rule": dept.get("budget_control_rule", "Warn when budget is exceeded"),
+            "ytd_consumption": consumed,
+            "remaining_budget": remaining
+        }
+    }
 
 @router.get("/departments/{dept_id}/consumption")
 def get_department_consumption(dept_id: str):
-    return {"success": True, "data": [{"month": "2026-08", "consumed_value": 85000}]}
+    target = unquote(dept_id).strip().lower()
+    dept = next((d for d in db["departments"] if str(d.get("id", "")).lower() == target or str(d.get("code", "")).lower() == target), {})
+    return {
+        "success": True,
+        "data": {
+            "department_id": dept.get("id"),
+            "department_name": dept.get("name"),
+            "cost_centre": dept.get("cost_centre", "IT-001"),
+            "monthly_breakdown": [
+                {"month": "2026-04", "consumed_value": 180000, "budget": 200000},
+                {"month": "2026-05", "consumed_value": 210000, "budget": 200000},
+                {"month": "2026-06", "consumed_value": 195000, "budget": 200000},
+                {"month": "2026-07", "consumed_value": 240000, "budget": 200000},
+                {"month": "2026-08", "consumed_value": 165000, "budget": 200000}
+            ]
+        }
+    }
 
 @router.post("/departments")
 def create_department(payload: dict):
     new_id = f"dept-{str(len(db['departments']) + 1).zfill(2)}"
     new_dept = {
         "id": new_id,
-        "code": payload.get("code") or f"DEPT-{len(db['departments'])+1}",
+        "code": payload.get("code") or f"DEPT-0{len(db['departments'])+1}",
         "name": payload.get("name", "New Dept"),
-        "head_id": payload.get("head_id", "usr-04"),
-        "cost_centre": payload.get("cost_centre", "CC-001"),
-        "budget_annual": float(payload.get("budget_annual", 1000000)),
-        "active_status": True
+        "head_name": payload.get("head_name", "Dr. Ananya Roy"),
+        "cost_centre": payload.get("cost_centre", "IT-001"),
+        "default_approver": payload.get("default_approver", "Sarah Jenkins"),
+        "branch": payload.get("branch", "Main Campus - Bangalore"),
+        "budget_monthly": float(payload.get("budget_monthly", 200000)),
+        "budget_quarterly": float(payload.get("budget_quarterly", 600000)),
+        "budget_annual": float(payload.get("budget_annual", 2400000)),
+        "category_budgets": payload.get("category_budgets", {
+            "cat-01": 1200000,
+            "cat-02": 500000,
+            "cat-03": 400000,
+            "cat-04": 300000
+        }),
+        "budget_control_rule": payload.get("budget_control_rule", "Warn when the budget is exceeded"),
+        "active_status": payload.get("active_status", True),
+        "ytd_consumption": 0
     }
     db["departments"].append(new_dept)
     save_db()
     return {"success": True, "data": new_dept}
 
+@router.put("/departments/{dept_id}")
+def update_department(dept_id: str, payload: dict):
+    target = unquote(dept_id).strip().lower()
+    for idx, d in enumerate(db["departments"]):
+        if str(d.get("id", "")).strip().lower() == target or str(d.get("code", "")).strip().lower() == target:
+            db["departments"][idx].update(payload)
+            save_db()
+            return {"success": True, "data": db["departments"][idx]}
+    return {"success": False, "message": "Department not found"}
+
+@router.delete("/departments/{dept_id}")
+def delete_department(dept_id: str):
+    target = unquote(dept_id).strip().lower()
+    initial_count = len(db["departments"])
+    db["departments"] = [
+        d for d in db["departments"]
+        if str(d.get("id", "")).strip().lower() != target
+        and str(d.get("code", "")).strip().lower() != target
+    ]
+    if len(db["departments"]) < initial_count:
+        save_db()
+        return {"success": True, "message": "Department deleted successfully"}
+    return {"success": False, "message": "Department not found"}
+
+@router.get("/cost-centres")
+def get_cost_centres():
+    # Return list of cost centres helping finance identify department expenses
+    result = [
+        {"cost_centre_code": d.get("cost_centre"), "department_name": d.get("name"), "department_code": d.get("code"), "head_name": d.get("head_name")}
+        for d in db["departments"]
+    ]
+    return {"success": True, "data": result}
+
+@router.get("/department-budgets")
+def get_department_budgets():
+    result = [
+        {
+            "department_id": d.get("id"),
+            "department_code": d.get("code"),
+            "department_name": d.get("name"),
+            "cost_centre": d.get("cost_centre"),
+            "budget_monthly": d.get("budget_monthly", 200000),
+            "budget_quarterly": d.get("budget_quarterly", 600000),
+            "budget_annual": d.get("budget_annual", 2400000),
+            "budget_control_rule": d.get("budget_control_rule", "Warn when the budget is exceeded")
+        }
+        for d in db["departments"]
+    ]
+    return {"success": True, "data": result}
+
+@router.get("/department-approvers")
+def get_department_approvers():
+    result = [
+        {
+            "department_id": d.get("id"),
+            "department_name": d.get("name"),
+            "head_name": d.get("head_name", "Dr. Ananya Roy"),
+            "default_approver": d.get("default_approver", "Sarah Jenkins")
+        }
+        for d in db["departments"]
+    ]
+    return {"success": True, "data": result}
+
+# =========================================================================
+# WAREHOUSES MASTER (Code, Name, Address, Manager, Branch, Type, Active Status)
+# =========================================================================
 @router.get("/warehouses")
 def get_warehouses():
     return {"success": True, "data": db["warehouses"]}
+
+@router.get("/warehouses/{wh_id}")
+def get_warehouse_by_id(wh_id: str):
+    target = unquote(wh_id).strip().lower()
+    wh = next((w for w in db["warehouses"] if str(w.get("id", "")).lower() == target or str(w.get("code", "")).lower() == target), None)
+    if wh:
+        return {"success": True, "data": wh}
+    return {"success": False, "message": "Warehouse not found"}
 
 @router.post("/warehouses")
 def create_warehouse(payload: dict):
@@ -282,33 +418,146 @@ def create_warehouse(payload: dict):
         "code": payload.get("code") or f"WH-0{len(db['warehouses'])+1}",
         "name": payload.get("name", "New Warehouse"),
         "address": payload.get("address", "Site Location"),
-        "manager_id": payload.get("manager_id", "usr-03"),
-        "active_status": True
+        "manager_name": payload.get("manager_name", "Michael Chang"),
+        "branch": payload.get("branch", "Main Campus - Bangalore"),
+        "warehouse_type": payload.get("warehouse_type", "Central Goods Store"),
+        "capacity_sqft": float(payload.get("capacity_sqft", 5000)),
+        "active_status": payload.get("active_status", True)
     }
     db["warehouses"].append(new_wh)
     save_db()
     return {"success": True, "data": new_wh}
 
+@router.put("/warehouses/{wh_id}")
+def update_warehouse(wh_id: str, payload: dict):
+    target = unquote(wh_id).strip().lower()
+    for idx, w in enumerate(db["warehouses"]):
+        if str(w.get("id", "")).strip().lower() == target or str(w.get("code", "")).strip().lower() == target:
+            db["warehouses"][idx].update(payload)
+            save_db()
+            return {"success": True, "data": db["warehouses"][idx]}
+    return {"success": False, "message": "Warehouse not found"}
+
+@router.delete("/warehouses/{wh_id}")
+def delete_warehouse(wh_id: str):
+    target = unquote(wh_id).strip().lower()
+    initial_count = len(db["warehouses"])
+    db["warehouses"] = [
+        w for w in db["warehouses"]
+        if str(w.get("id", "")).strip().lower() != target
+        and str(w.get("code", "")).strip().lower() != target
+    ]
+    if len(db["warehouses"]) < initial_count:
+        save_db()
+        return {"success": True, "message": "Warehouse deleted successfully"}
+    return {"success": False, "message": "Warehouse not found"}
+
+# =========================================================================
+# LOCATION LEVELS (Warehouse -> Zone -> Rack -> Shelf -> Bin)
+# =========================================================================
 @router.get("/locations")
 @router.get("/warehouse-locations")
 def get_warehouse_locations():
     return {"success": True, "data": db["warehouse_locations"]}
 
+@router.get("/warehouse-zones")
+def get_warehouse_zones():
+    zones = list({l.get("zone", "Zone A") for l in db["warehouse_locations"]})
+    return {"success": True, "data": [{"zone_name": z} for z in zones]}
+
+@router.get("/warehouse-racks")
+def get_warehouse_racks():
+    racks = list({l.get("rack", "Rack 01") for l in db["warehouse_locations"]})
+    return {"success": True, "data": [{"rack_name": r} for r in racks]}
+
+@router.get("/warehouse-shelves")
+def get_warehouse_shelves():
+    shelves = list({l.get("shelf", "Shelf 1") for l in db["warehouse_locations"]})
+    return {"success": True, "data": [{"shelf_name": s} for s in shelves]}
+
+@router.get("/warehouse-bins")
+def get_warehouse_bins():
+    bins = list({l.get("bin", "Bin 01") for l in db["warehouse_locations"]})
+    return {"success": True, "data": [{"bin_name": b} for b in bins]}
+
 @router.post("/locations")
 def create_location(payload: dict):
     new_id = f"loc-{str(len(db['warehouse_locations']) + 1).zfill(2)}"
+    zone = payload.get("zone", "Zone A")
+    rack = payload.get("rack", "Rack 01")
+    shelf = payload.get("shelf", "Shelf 1")
+    bin_name = payload.get("bin", "Bin 01")
+    auto_code = f"{zone.replace(' ', '')}-{rack.replace(' ', '')}-{shelf.replace(' ', '')}-{bin_name.replace(' ', '')}"
+    
     new_loc = {
         "id": new_id,
         "warehouse_id": payload.get("warehouse_id", "wh-01"),
-        "zone": payload.get("zone", "Zone A"),
-        "rack": payload.get("rack", "Rack 1"),
-        "shelf": payload.get("shelf", "Shelf 1"),
-        "bin": payload.get("bin", "Bin 1"),
-        "code": payload.get("code") or f"LOC-0{len(db['warehouse_locations'])+1}"
+        "zone": zone,
+        "rack": rack,
+        "shelf": shelf,
+        "bin": bin_name,
+        "code": payload.get("code") or auto_code,
+        "active_status": payload.get("active_status", True)
     }
     db["warehouse_locations"].append(new_loc)
     save_db()
     return {"success": True, "data": new_loc}
+
+@router.put("/locations/{loc_id}")
+def update_location(loc_id: str, payload: dict):
+    target = unquote(loc_id).strip().lower()
+    for idx, l in enumerate(db["warehouse_locations"]):
+        if str(l.get("id", "")).strip().lower() == target or str(l.get("code", "")).strip().lower() == target:
+            db["warehouse_locations"][idx].update(payload)
+            save_db()
+            return {"success": True, "data": db["warehouse_locations"][idx]}
+    return {"success": False, "message": "Location bin not found"}
+
+@router.delete("/locations/{loc_id}")
+def delete_location(loc_id: str):
+    target = unquote(loc_id).strip().lower()
+    initial_count = len(db["warehouse_locations"])
+    db["warehouse_locations"] = [
+        l for l in db["warehouse_locations"]
+        if str(l.get("id", "")).strip().lower() != target
+        and str(l.get("code", "")).strip().lower() != target
+    ]
+    if len(db["warehouse_locations"]) < initial_count:
+        save_db()
+        return {"success": True, "message": "Location bin deleted successfully"}
+    return {"success": False, "message": "Location bin not found"}
+
+# =========================================================================
+# PERFORMANCE INVENTORY BALANCES (item_id + warehouse_id + location_id + batch_id)
+# =========================================================================
+@router.get("/inventory-balances")
+def get_inventory_balances():
+    # Performance table maintaining balances against warehouse & bin locations
+    result = []
+    for bal in db.get("inventory_balances", []):
+        item = next((i for i in db["items"] if i["id"] == bal.get("item_id")), {})
+        wh = next((w for w in db["warehouses"] if w["id"] == bal.get("warehouse_id")), {})
+        loc = next((l for l in db["warehouse_locations"] if l["id"] == bal.get("location_id")), {})
+        
+        composite_key = f"{bal.get('item_id')}+{bal.get('warehouse_id')}+{bal.get('location_id')}+{bal.get('batch_id', 'DEFAULT')}"
+        result.append({
+            "composite_key": composite_key,
+            "id": bal.get("id"),
+            "item_id": bal.get("item_id"),
+            "item_code": item.get("item_code", "N/A"),
+            "item_name": item.get("item_name", "N/A"),
+            "warehouse_id": bal.get("warehouse_id"),
+            "warehouse_name": wh.get("name", "N/A"),
+            "location_id": bal.get("location_id"),
+            "location_code": loc.get("code", "N/A"),
+            "batch_id": bal.get("batch_id", "DEFAULT"),
+            "on_hand_qty": bal.get("on_hand_qty", 0),
+            "reserved_qty": bal.get("reserved_qty", 0),
+            "available_qty": bal.get("available_qty", 0),
+            "valuation_rate": bal.get("valuation_rate", 0),
+            "total_value": bal.get("available_qty", 0) * bal.get("valuation_rate", 0)
+        })
+    return {"success": True, "data": result}
 
 @router.get("/roles")
 def get_roles():
