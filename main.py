@@ -24,7 +24,7 @@ from routers.dashboard import router as dashboard_router
 
 
 # FastAPI is exposed externally through Nginx at /api
-root_path = os.getenv("ROOT_PATH", "/api")
+root_path = os.getenv("ROOT_PATH", "")
 
 app = FastAPI(
     title="Inventory & Procurement System API",
