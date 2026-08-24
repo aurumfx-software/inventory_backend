@@ -71,15 +71,21 @@ def run_migration():
                 continue
 
             count = 0
-            for item in records:
-                item_id = str(item.get("id", f"{table_name}-{count+1}"))
+            for idx, item in enumerate(records):
+                if isinstance(item, dict):
+                    item_id = str(item.get("id", f"{table_name}-{idx+1}"))
+                    payload_val = item
+                else:
+                    item_id = str(item)
+                    payload_val = {"id": str(item), "name": str(item)}
+
                 existing = session.query(model_cls).filter_by(id=item_id).first()
                 if not existing:
-                    obj = model_cls(id=item_id, payload=item)
+                    obj = model_cls(id=item_id, payload=payload_val)
                     session.add(obj)
                     count += 1
                 else:
-                    existing.payload = item
+                    existing.payload = payload_val
                     count += 1
 
             migrated_counts[table_name] = count
@@ -94,6 +100,8 @@ def run_migration():
         return True
     except Exception as err:
         session.rollback()
+        import traceback
+        traceback.print_exc()
         print(f"[ERROR] Migration failed: {err}")
         return False
     finally:

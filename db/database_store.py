@@ -85,17 +85,25 @@ def save_db():
                 if not isinstance(records, list):
                     continue
                 for idx, item in enumerate(records):
-                    item_id = str(item.get("id", f"{table_name}-{idx+1}"))
+                    if isinstance(item, dict):
+                        item_id = str(item.get("id", f"{table_name}-{idx+1}"))
+                        payload_val = item
+                    else:
+                        item_id = str(item)
+                        payload_val = {"id": str(item), "name": str(item)}
+
                     existing = session.query(model_cls).filter_by(id=item_id).first()
                     if not existing:
-                        obj = model_cls(id=item_id, payload=item)
+                        obj = model_cls(id=item_id, payload=payload_val)
                         session.add(obj)
                     else:
-                        existing.payload = item
+                        existing.payload = payload_val
             session.commit()
             print("[DB SUCCESS] Database state saved to PostgreSQL successfully.")
         except Exception as pg_err:
             session.rollback()
+            import traceback
+            traceback.print_exc()
             print("[DB ERROR] Error saving to PostgreSQL database:", pg_err)
         finally:
             session.close()
