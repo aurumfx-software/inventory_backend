@@ -18,12 +18,6 @@
    pip install -r requirements.txt
    ```
 
-2. **Configure Environment Variables:**
-   Copy `.env.example` to `.env` and update your PostgreSQL credentials:
-   ```bash
-   cp .env.example .env
-   ```
-
 3. **Run PostgreSQL Database Migration:**
    ```bash
    python scripts/migrate_to_postgres.py
