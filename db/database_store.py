@@ -2,10 +2,8 @@ import os
 import json
 from datetime import datetime
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_FILE = os.path.join(BASE_DIR, 'inventory_store.json')
-
 db = {
+
     "users": [],
     "roles": [],
     "permissions": [],
@@ -58,28 +56,106 @@ db = {
 }
 
 def save_db():
+    """Save/Persist current database state directly to PostgreSQL database tables."""
     try:
-        os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
-        with open(DB_FILE, 'w', encoding='utf-8') as f:
-            json.dump(db, f, indent=2, ensure_ascii=False)
+        from db.database import check_db_connection, SessionLocal, engine, Base
+        from models.orm_models import TABLE_MODEL_MAP, SystemSetting
+
+        if not check_db_connection():
+            print("[DB ERROR] Cannot save: PostgreSQL database connection is offline. Check .env credentials.")
+            return
+
+        Base.metadata.create_all(bind=engine)
+        session = SessionLocal()
+        try:
+            # Sync settings to PostgreSQL
+            if "settings" in db and isinstance(db["settings"], dict):
+                for key, val in db["settings"].items():
+                    setting_obj = session.query(SystemSetting).filter_by(key=key).first()
+                    payload_val = val if isinstance(val, (dict, list)) else {"value": val}
+                    if not setting_obj:
+                        setting_obj = SystemSetting(key=key, payload=payload_val)
+                        session.add(setting_obj)
+                    else:
+                        setting_obj.payload = payload_val
+
+            # Sync all domain tables to PostgreSQL
+            for table_name, model_cls in TABLE_MODEL_MAP.items():
+                records = db.get(table_name, [])
+                if not isinstance(records, list):
+                    continue
+                for idx, item in enumerate(records):
+                    item_id = str(item.get("id", f"{table_name}-{idx+1}"))
+                    existing = session.query(model_cls).filter_by(id=item_id).first()
+                    if not existing:
+                        obj = model_cls(id=item_id, payload=item)
+                        session.add(obj)
+                    else:
+                        existing.payload = item
+            session.commit()
+            print("[DB SUCCESS] Database state saved to PostgreSQL successfully.")
+        except Exception as pg_err:
+            session.rollback()
+            print("[DB ERROR] Error saving to PostgreSQL database:", pg_err)
+        finally:
+            session.close()
     except Exception as err:
-        print("Failed to save database file:", err)
+        print("[DB ERROR] Failed to connect to PostgreSQL:", err)
 
 def load_db():
+    """Load database state exclusively from PostgreSQL database tables."""
     global db
+
     try:
-        if os.path.exists(DB_FILE):
-            with open(DB_FILE, 'r', encoding='utf-8') as f:
-                loaded = json.load(f)
-                db.update(loaded)
-        else:
-            seed_initial_data()
-            save_db()
+        from db.database import check_db_connection, SessionLocal, engine, Base
+        from models.orm_models import TABLE_MODEL_MAP, SystemSetting
+
+        if not check_db_connection():
+            print("[DB WARN] PostgreSQL database is not accessible. Seeding in-memory state until PostgreSQL connects.")
+            if not db.get("users"):
+                seed_initial_data()
+            return db
+
+        Base.metadata.create_all(bind=engine)
+        session = SessionLocal()
+        try:
+            # Load settings from PostgreSQL
+            settings_rows = session.query(SystemSetting).all()
+            if settings_rows:
+                db["settings"] = {}
+                for row in settings_rows:
+                    val = row.payload
+                    if isinstance(val, dict) and "value" in val and len(val) == 1:
+                        db["settings"][row.key] = val["value"]
+                    else:
+                        db["settings"][row.key] = val
+
+            # Load domain tables from PostgreSQL
+            loaded_any = False
+            for table_name, model_cls in TABLE_MODEL_MAP.items():
+                rows = session.query(model_cls).all()
+                if rows:
+                    db[table_name] = [r.payload for r in rows if r.payload]
+                    loaded_any = True
+
+            if not loaded_any:
+                print("[DB INFO] PostgreSQL database is empty. Seeding initial data directly into PostgreSQL...")
+                seed_initial_data()
+                save_db()
+            else:
+                print("[DB SUCCESS] Database state loaded strictly from PostgreSQL database.")
+
+            return db
+        except Exception as pg_load_err:
+            print("[DB ERROR] Error loading from PostgreSQL:", pg_load_err)
+        finally:
+            session.close()
     except Exception as err:
-        print("Failed to load database file, initializing seed:", err)
-        seed_initial_data()
-        save_db()
+        print("[DB ERROR] Failed PostgreSQL database load:", err)
+
     return db
+
+
 
 def seed_initial_data():
     print("Seeding initial Python FastAPI database...")

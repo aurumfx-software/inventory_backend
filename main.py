@@ -81,12 +81,16 @@ def get_openapi_schema_fallback():
 # Healthcheck Endpoint
 @app.get("/api/health")
 def healthcheck():
+    from db.database import check_db_connection
+    db_status = "Connected (PostgreSQL)" if check_db_connection() else "Disconnected (Falling back to local JSON store)"
     return {
         "success": True,
         "status": "UP",
+        "database": db_status,
         "message": "Inventory & Procurement Python FastAPI Server Running",
         "engine": "FastAPI (Python 3)"
     }
+
 
 if __name__ == "__main__":
     import uvicorn

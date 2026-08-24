@@ -5,9 +5,11 @@
 ## Technology Stack
 - **Framework:** FastAPI
 - **ASGI Server:** Uvicorn
+- **ORM & Driver:** SQLAlchemy & Psycopg2
+- **Database Engine:** PostgreSQL
 - **Validation Schemas:** Pydantic
 - **Auth:** PyJWT & Passlib
-- **Data Persistence:** File-synced JSON Store (`inventory_store.json`)
+
 
 ## How to Run
 

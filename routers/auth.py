@@ -13,11 +13,35 @@ ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
 @router.post("/login")
 def login(req: LoginRequest):
-    email = req.email.lower().strip()
-    user = next((u for u in db["users"] if u["email"].lower() == email), None)
-    
+    email = (req.email or "").lower().strip()
+    password = req.password or ""
+
+    if not email:
+        raise HTTPException(status_code=400, detail="Email address is required.")
+
+    if not password:
+        raise HTTPException(status_code=400, detail="Password is required.")
+
+    user = next((u for u in db.get("users", []) if u["email"].lower() == email), None)
+
     if not user:
-        user = db["users"][0]
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication Failed: Invalid email address. Access denied."
+        )
+
+    if not user.get("is_active", True):
+        raise HTTPException(
+            status_code=403,
+            detail="Account Suspended: User account is inactive. Please contact Administrator."
+        )
+
+    expected_password = user.get("password", "password123")
+    if password != expected_password:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication Failed: Incorrect password. Access denied."
+        )
 
     token_data = {
         "sub": user["id"],
@@ -27,7 +51,7 @@ def login(req: LoginRequest):
     }
     token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
 
-    role = next((r for r in db["roles"] if r["id"] == user["role_id"]), None)
+    role = next((r for r in db.get("roles", []) if r["id"] == user["role_id"]), None)
 
     return {
         "success": True,
