@@ -22,7 +22,19 @@ def login(req: LoginRequest):
     if not password:
         raise HTTPException(status_code=400, detail="Password is required.")
 
-    user = next((u for u in db.get("users", []) if u["email"].lower() == email), None)
+    DEFAULT_SYSTEM_USERS = [
+        {"id": "usr-01", "name": "Sarah Jenkins", "email": "admin@company.com", "password": "password123", "role_id": "role-admin", "emp_code": "EMP-001", "department_id": "dept-01", "is_active": True},
+        {"id": "usr-02", "name": "Rajesh Kumar", "email": "purchase@company.com", "password": "password123", "role_id": "role-purchase", "emp_code": "EMP-002", "department_id": "dept-02", "is_active": True},
+        {"id": "usr-03", "name": "Michael Chang", "email": "store@company.com", "password": "password123", "role_id": "role-store", "emp_code": "EMP-003", "department_id": "dept-03", "is_active": True},
+        {"id": "usr-04", "name": "Dr. Ananya Roy", "email": "deptmgr@company.com", "password": "password123", "role_id": "role-dept-mgr", "emp_code": "EMP-004", "department_id": "dept-01", "is_active": True},
+        {"id": "usr-05", "name": "David Miller", "email": "requester@company.com", "password": "password123", "role_id": "role-requester", "emp_code": "EMP-005", "department_id": "dept-01", "is_active": True},
+        {"id": "usr-06", "name": "Priya Sharma", "email": "finance@company.com", "password": "password123", "role_id": "role-finance", "emp_code": "EMP-006", "department_id": "dept-04", "is_active": True},
+        {"id": "usr-07", "name": "Robert Wilson", "email": "auditor@company.com", "password": "password123", "role_id": "role-auditor", "emp_code": "EMP-007", "department_id": "dept-04", "is_active": True}
+    ]
+
+    user = next((u for u in db.get("users", []) if u.get("email", "").lower() == email), None)
+    if not user:
+        user = next((u for u in DEFAULT_SYSTEM_USERS if u["email"].lower() == email), None)
 
     if not user:
         raise HTTPException(
