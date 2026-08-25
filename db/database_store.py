@@ -204,6 +204,19 @@ def load_db():
             # Force purge all sample items, suppliers, departments, warehouses, and transactions to ensure 100% fresh software
             purge_all_sample_data()
 
+            # Always preserve default system login accounts
+            if not db.get("users"):
+                db["users"] = [
+                    {"id": "usr-01", "name": "Sarah Jenkins", "email": "admin@company.com", "password": "password123", "role_id": "role-admin", "emp_code": "EMP-001", "department_id": "dept-01", "branch_id": "br-01", "is_active": True},
+                    {"id": "usr-02", "name": "Rajesh Kumar", "email": "purchase@company.com", "password": "password123", "role_id": "role-purchase", "emp_code": "EMP-002", "department_id": "dept-02", "branch_id": "br-01", "is_active": True},
+                    {"id": "usr-03", "name": "Michael Chang", "email": "store@company.com", "password": "password123", "role_id": "role-store", "emp_code": "EMP-003", "department_id": "dept-03", "branch_id": "br-01", "is_active": True},
+                    {"id": "usr-04", "name": "Dr. Ananya Roy", "email": "deptmgr@company.com", "password": "password123", "role_id": "role-dept-mgr", "emp_code": "EMP-004", "department_id": "dept-01", "branch_id": "br-01", "is_active": True},
+                    {"id": "usr-05", "name": "David Miller", "email": "requester@company.com", "password": "password123", "role_id": "role-requester", "emp_code": "EMP-005", "department_id": "dept-01", "branch_id": "br-01", "is_active": True},
+                    {"id": "usr-06", "name": "Priya Sharma", "email": "finance@company.com", "password": "password123", "role_id": "role-finance", "emp_code": "EMP-006", "department_id": "dept-04", "branch_id": "br-01", "is_active": True},
+                    {"id": "usr-07", "name": "Robert Wilson", "email": "auditor@company.com", "password": "password123", "role_id": "role-auditor", "emp_code": "EMP-007", "department_id": "dept-04", "branch_id": "br-01", "is_active": True}
+                ]
+                save_db()
+
             return db
         except Exception as pg_load_err:
             print("[DB ERROR] Error loading from PostgreSQL:", pg_load_err)
