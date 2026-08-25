@@ -84,6 +84,7 @@ def save_db():
                 records = db.get(table_name, [])
                 if not isinstance(records, list):
                     continue
+                current_ids = set()
                 for idx, item in enumerate(records):
                     if isinstance(item, dict):
                         item_id = str(item.get("id", f"{table_name}-{idx+1}"))
@@ -92,12 +93,18 @@ def save_db():
                         item_id = str(item)
                         payload_val = {"id": str(item), "name": str(item)}
 
+                    current_ids.add(item_id)
                     existing = session.query(model_cls).filter_by(id=item_id).first()
                     if not existing:
                         obj = model_cls(id=item_id, payload=payload_val)
                         session.add(obj)
                     else:
                         existing.payload = payload_val
+                        from sqlalchemy.orm.attributes import flag_modified
+                        flag_modified(existing, "payload")
+
+                if current_ids:
+                    session.query(model_cls).filter(~model_cls.id.in_(current_ids)).delete(synchronize_session=False)
             session.commit()
             print("[DB SUCCESS] Database state saved to PostgreSQL successfully.")
         except Exception as pg_err:

@@ -139,9 +139,38 @@ def delete_item(item_id: str):
 def get_categories():
     return {"success": True, "data": db["item_categories"]}
 
+@router.post("/categories")
+@router.post("/item-categories")
+def create_category(payload: dict):
+    new_id = payload.get("id") or f"cat-{str(len(db['item_categories']) + 1).zfill(2)}"
+    new_cat = {
+        "id": new_id,
+        "category_code": payload.get("category_code") or f"CAT-{len(db['item_categories'])+1}",
+        "category_name": payload.get("category_name") or payload.get("name", "New Category"),
+        "description": payload.get("description", ""),
+        "is_active": payload.get("is_active", True)
+    }
+    db["item_categories"].append(new_cat)
+    save_db()
+    return {"success": True, "data": new_cat}
+
 @router.get("/brands")
 def get_brands():
     return {"success": True, "data": db["brands"]}
+
+@router.post("/brands")
+def create_brand(payload: dict):
+    new_id = payload.get("id") or f"brd-{str(len(db['brands']) + 1).zfill(2)}"
+    new_brand = {
+        "id": new_id,
+        "brand_code": payload.get("brand_code") or f"BRD-{len(db['brands'])+1}",
+        "brand_name": payload.get("brand_name") or payload.get("name", "New Brand"),
+        "description": payload.get("description", ""),
+        "is_active": payload.get("is_active", True)
+    }
+    db["brands"].append(new_brand)
+    save_db()
+    return {"success": True, "data": new_brand}
 
 @router.get("/uom")
 @router.get("/uoms")
@@ -149,10 +178,39 @@ def get_brands():
 def get_uom():
     return {"success": True, "data": db["units_of_measure"]}
 
+@router.post("/uom")
+@router.post("/uoms")
+def create_uom(payload: dict):
+    new_id = payload.get("id") or f"uom-{str(len(db['units_of_measure']) + 1).zfill(2)}"
+    new_uom = {
+        "id": new_id,
+        "unit_name": payload.get("unit_name") or payload.get("name", "New Unit"),
+        "unit_symbol": payload.get("unit_symbol") or payload.get("symbol", "Unit"),
+        "is_active": payload.get("is_active", True)
+    }
+    db["units_of_measure"].append(new_uom)
+    save_db()
+    return {"success": True, "data": new_uom}
+
 @router.get("/taxes")
 @router.get("/tax-rates")
 def get_tax_rates():
     return {"success": True, "data": db["tax_rates"]}
+
+@router.post("/taxes")
+@router.post("/tax-rates")
+def create_tax_rate(payload: dict):
+    new_id = payload.get("id") or f"tax-{str(len(db['tax_rates']) + 1).zfill(2)}"
+    new_tax = {
+        "id": new_id,
+        "tax_name": payload.get("tax_name") or payload.get("name", "New Tax"),
+        "tax_percentage": float(payload.get("tax_percentage") or payload.get("percentage", 18)),
+        "tax_type": payload.get("tax_type", "GST"),
+        "is_active": payload.get("is_active", True)
+    }
+    db["tax_rates"].append(new_tax)
+    save_db()
+    return {"success": True, "data": new_tax}
 
 # =========================================================================
 # SUPPLIERS MASTER
@@ -412,7 +470,7 @@ def get_warehouse_by_id(wh_id: str):
 
 @router.post("/warehouses")
 def create_warehouse(payload: dict):
-    new_id = f"wh-{str(len(db['warehouses']) + 1).zfill(2)}"
+    new_id = payload.get("id") or f"wh-{str(len(db['warehouses']) + 1).zfill(2)}"
     new_wh = {
         "id": new_id,
         "code": payload.get("code") or f"WH-0{len(db['warehouses'])+1}",
@@ -422,7 +480,9 @@ def create_warehouse(payload: dict):
         "branch": payload.get("branch", "Main Campus - Bangalore"),
         "warehouse_type": payload.get("warehouse_type", "Central Goods Store"),
         "capacity_sqft": float(payload.get("capacity_sqft", 5000)),
-        "active_status": payload.get("active_status", True)
+        "active_status": payload.get("active_status", True),
+        "total_bins": payload.get("total_bins", 10),
+        "occupied_bins": payload.get("occupied_bins", 2)
     }
     db["warehouses"].append(new_wh)
     save_db()
