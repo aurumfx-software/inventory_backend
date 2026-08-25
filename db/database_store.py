@@ -105,6 +105,8 @@ def save_db():
 
                 if current_ids:
                     session.query(model_cls).filter(~model_cls.id.in_(current_ids)).delete(synchronize_session=False)
+                else:
+                    session.query(model_cls).delete(synchronize_session=False)
             session.commit()
             print("[DB SUCCESS] Database state saved to PostgreSQL successfully.")
         except Exception as pg_err:
@@ -116,6 +118,45 @@ def save_db():
             session.close()
     except Exception as err:
         print("[DB ERROR] Failed to connect to PostgreSQL:", err)
+
+def purge_all_sample_data():
+    """Wipe out all sample records (items, suppliers, departments, warehouses, categories, brands, indents, POs, approvals, etc.) for a 100% fresh system."""
+    global db
+    tables_to_purge = [
+        "items", "item_batches", "item_serials", "inventory_balances", "inventory_ledger",
+        "suppliers", "supplier_contacts", "supplier_bank_accounts",
+        "departments", "cost_centres", "warehouses", "warehouse_locations",
+        "item_categories", "brands",
+        "indents", "indent_items", "purchase_orders", "po_items",
+        "approval_requests", "approval_actions", "approval_delegations",
+        "rfqs", "rfq_items", "rfq_suppliers", "quotations", "quotation_items",
+        "goods_receipts", "grn_items", "quality_inspections",
+        "stock_issues", "stock_issue_items", "stock_returns", "supplier_returns",
+        "stock_transfers", "stock_transfer_items", "stock_adjustments",
+        "stock_count_sessions", "stock_count_entries", "stock_reservations", "assets"
+    ]
+    for tbl in tables_to_purge:
+        db[tbl] = []
+    
+    try:
+        from db.database import check_db_connection, SessionLocal
+        from models.orm_models import TABLE_MODEL_MAP
+        if check_db_connection():
+            session = SessionLocal()
+            try:
+                for tbl in tables_to_purge:
+                    model_cls = TABLE_MODEL_MAP.get(tbl)
+                    if model_cls:
+                        session.query(model_cls).delete(synchronize_session=False)
+                session.commit()
+                print("[DB PURGE] All sample items, suppliers, departments, warehouses, and transactions permanently purged from PostgreSQL.")
+            except Exception as e:
+                session.rollback()
+                print("[DB ERROR] Failed purging sample data:", e)
+            finally:
+                session.close()
+    except Exception as err:
+        print("[DB ERROR] Purge connect error:", err)
 
 def load_db():
     """Load database state exclusively from PostgreSQL database tables."""
@@ -159,6 +200,9 @@ def load_db():
                 save_db()
             else:
                 print("[DB SUCCESS] Database state loaded strictly from PostgreSQL database.")
+
+            # Force purge all sample items, suppliers, departments, warehouses, and transactions to ensure 100% fresh software
+            purge_all_sample_data()
 
             return db
         except Exception as pg_load_err:
@@ -234,39 +278,11 @@ def seed_initial_data():
         {"id": "usr-07", "name": "Robert Wilson", "email": "auditor@company.com", "password": "password123", "role_id": "role-auditor", "emp_code": "EMP-007", "department_id": "dept-04", "branch_id": "br-01", "is_active": True}
     ]
 
-    db["departments"] = [
-        {"id": "dept-01", "code": "IT-DEPT", "name": "Information Technology", "head_id": "usr-04", "cost_centre": "IT-001", "budget_annual": 2500000, "active_status": True},
-        {"id": "dept-02", "code": "PUR-DEPT", "name": "Procurement & Purchasing", "head_id": "usr-02", "cost_centre": "PUR-002", "budget_annual": 1500000, "active_status": True},
-        {"id": "dept-03", "code": "WH-DEPT", "name": "Warehouse & Stores Operations", "head_id": "usr-03", "cost_centre": "STR-003", "budget_annual": 1000000, "active_status": True},
-        {"id": "dept-04", "code": "FIN-DEPT", "name": "Finance & Accounts", "head_id": "usr-06", "cost_centre": "FIN-004", "budget_annual": 800000, "active_status": True},
-        {"id": "dept-05", "code": "MNT-DEPT", "name": "Maintenance & Engineering", "head_id": "usr-01", "cost_centre": "MNT-005", "budget_annual": 1800000, "active_status": True}
-    ]
-
-    db["warehouses"] = [
-        {"id": "wh-01", "code": "WH-MAIN", "name": "Central Goods Warehouse", "address": "Plot 12, Industrial Hub", "manager_id": "usr-03", "active_status": True},
-        {"id": "wh-02", "code": "WH-SUB1", "name": "IT Assets & Electronics Store", "address": "Building B, Floor 2", "manager_id": "usr-03", "active_status": True},
-        {"id": "wh-03", "code": "WH-TRANS", "name": "Transit & Quarantine Store", "address": "Receiving Bay 1", "manager_id": "usr-03", "active_status": True}
-    ]
-
-    db["warehouse_locations"] = [
-        {"id": "loc-01", "warehouse_id": "wh-01", "zone": "Zone A", "rack": "Rack 01", "shelf": "Shelf 2", "bin": "Bin 05", "code": "A-R01-S2-B05"},
-        {"id": "loc-02", "warehouse_id": "wh-01", "zone": "Zone A", "rack": "Rack 02", "shelf": "Shelf 1", "bin": "Bin 12", "code": "A-R02-S1-B12"},
-        {"id": "loc-03", "warehouse_id": "wh-02", "zone": "Zone IT", "rack": "Rack IT-1", "shelf": "Shelf Top", "bin": "Bin SEC-1", "code": "IT-R1-ST-B1"}
-    ]
-
-    db["item_categories"] = [
-        {"id": "cat-01", "category_code": "IT", "category_name": "IT Equipment", "description": "Laptops, Desktops, Peripherals", "is_active": True},
-        {"id": "cat-02", "category_code": "ELE", "category_name": "Electrical & Hardware", "description": "Cables, Switches, Power Supplies", "is_active": True},
-        {"id": "cat-03", "category_code": "OFF", "category_name": "Office Supplies & Stationery", "description": "Paper, Pens, Cartridges", "is_active": True},
-        {"id": "cat-04", "category_code": "RAW", "category_name": "Raw Materials", "description": "Steel, Aluminium, Chemicals", "is_active": True}
-    ]
-
-    db["brands"] = [
-        {"id": "brd-01", "brand_name": "Dell Technologies"},
-        {"id": "brd-02", "brand_name": "HP Enterprise"},
-        {"id": "brd-03", "brand_name": "Schneider Electric"},
-        {"id": "brd-04", "brand_name": "3M Industrial"}
-    ]
+    db["departments"] = []
+    db["warehouses"] = []
+    db["warehouse_locations"] = []
+    db["item_categories"] = []
+    db["brands"] = []
 
     db["units_of_measure"] = [
         {"id": "uom-01", "unit_name": "Pieces", "unit_symbol": "Pcs", "decimal_allowed": False},
@@ -284,269 +300,12 @@ def seed_initial_data():
         {"id": "tax-28", "name": "GST 28%", "percentage": 28, "tax_type": "GST_28"}
     ]
 
-    db["items"] = [
-        {
-            "id": "itm-01",
-            "item_code": "IT-LAP-0001",
-            "item_name": "Dell Latitude 5440 Laptop",
-            "description": "Intel i7 13th Gen, 16GB RAM, 512GB SSD, 14-inch Display",
-            "category_id": "cat-01",
-            "brand_id": "brd-01",
-            "uom_id": "uom-01",
-            "purchase_uom_id": "uom-01",
-            "tax_rate_id": "tax-18",
-            "hsn_sac_code": "84713010",
-            "min_stock_level": 5,
-            "max_stock_level": 50,
-            "reorder_level": 10,
-            "reorder_qty": 15,
-            "valuation_rate": 72000,
-            "default_location_id": "loc-03",
-            "is_batch_tracked": False,
-            "is_serial_tracked": True,
-            "is_expiry_tracked": False,
-            "barcode": "8901234567891",
-            "image_url": "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=300&auto=format&fit=crop&q=60",
-            "is_active": True,
-            "created_at": now
-        },
-        {
-            "id": "itm-02",
-            "item_code": "ELE-CBL-0002",
-            "item_name": "Cat6 Ethernet Cable (305m Drum)",
-            "description": "High speed Gigabit Shielded Copper Cable Drum",
-            "category_id": "cat-02",
-            "brand_id": "brd-03",
-            "uom_id": "uom-04",
-            "purchase_uom_id": "uom-04",
-            "tax_rate_id": "tax-18",
-            "hsn_sac_code": "85444999",
-            "min_stock_level": 100,
-            "max_stock_level": 1000,
-            "reorder_level": 300,
-            "reorder_qty": 500,
-            "valuation_rate": 45,
-            "default_location_id": "loc-01",
-            "is_batch_tracked": True,
-            "is_serial_tracked": False,
-            "is_expiry_tracked": False,
-            "barcode": "8901234567892",
-            "image_url": "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=300&auto=format&fit=crop&q=60",
-            "is_active": True,
-            "created_at": now
-        },
-        {
-            "id": "itm-03",
-            "item_code": "OFF-PPR-0003",
-            "item_name": "A4 Copy Paper 80GSM (Rim)",
-            "description": "High brightness multi-purpose printing paper",
-            "category_id": "cat-03",
-            "brand_id": "brd-04",
-            "uom_id": "uom-01",
-            "purchase_uom_id": "uom-02",
-            "tax_rate_id": "tax-12",
-            "hsn_sac_code": "48025610",
-            "min_stock_level": 20,
-            "max_stock_level": 200,
-            "reorder_level": 50,
-            "reorder_qty": 100,
-            "valuation_rate": 280,
-            "default_location_id": "loc-02",
-            "is_batch_tracked": False,
-            "is_serial_tracked": False,
-            "is_expiry_tracked": False,
-            "barcode": "8901234567893",
-            "image_url": "https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=300&auto=format&fit=crop&q=60",
-            "is_active": True,
-            "created_at": now
-        },
-        {
-            "id": "itm-04",
-            "item_code": "RAW-CHM-0004",
-            "item_name": "Industrial Cleaning Solvent C-40",
-            "description": "High purity solvent for electronic component washing",
-            "category_id": "cat-04",
-            "brand_id": "brd-04",
-            "uom_id": "uom-05",
-            "purchase_uom_id": "uom-05",
-            "tax_rate_id": "tax-18",
-            "hsn_sac_code": "38140010",
-            "min_stock_level": 50,
-            "max_stock_level": 500,
-            "reorder_level": 150,
-            "reorder_qty": 200,
-            "valuation_rate": 350,
-            "default_location_id": "loc-01",
-            "is_batch_tracked": True,
-            "is_serial_tracked": False,
-            "is_expiry_tracked": True,
-            "barcode": "8901234567894",
-            "image_url": "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=300&auto=format&fit=crop&q=60",
-            "is_active": True,
-            "created_at": now
-        }
-    ]
+    db["items"] = []
+    db["suppliers"] = []
+    db["inventory_balances"] = []
 
-    db["suppliers"] = [
-        {
-            "id": "sup-01",
-            "supplier_code": "SUP-00045",
-            "supplier_name": "Infotech Systems Ltd",
-            "contact_person": "Vikram Malhotra",
-            "phone": "+91 98765 43210",
-            "email": "sales@infotechsystems.com",
-            "address_registered": "45 Technology Park, Whitefield, Bangalore",
-            "address_billing": "45 Technology Park, Whitefield, Bangalore",
-            "gst_number": "29AAACI1234F1Z9",
-            "pan_number": "AAACI1234F",
-            "payment_terms": "Net 30 days",
-            "delivery_lead_time_days": 5,
-            "rating": 4.8,
-            "approval_status": "Approved",
-            "is_active": True
-        },
-        {
-            "id": "sup-02",
-            "supplier_code": "SUP-00046",
-            "supplier_name": "Apex Electrical Controls",
-            "contact_person": "Suresh Menon",
-            "phone": "+91 98450 11223",
-            "email": "orders@apexelectrical.com",
-            "address_registered": "78 Industrial Estate, Peenya, Bangalore",
-            "address_billing": "78 Industrial Estate, Peenya, Bangalore",
-            "gst_number": "29AAACE9876K1Z1",
-            "pan_number": "AAACE9876K",
-            "payment_terms": "Net 15 days",
-            "delivery_lead_time_days": 3,
-            "rating": 4.5,
-            "approval_status": "Approved",
-            "is_active": True
-        }
-    ]
-
-    db["inventory_balances"] = [
-        {"id": "bal-01", "item_id": "itm-01", "warehouse_id": "wh-02", "location_id": "loc-03", "on_hand_qty": 8, "reserved_qty": 3, "available_qty": 5, "valuation_rate": 72000},
-        {"id": "bal-02", "item_id": "itm-02", "warehouse_id": "wh-01", "location_id": "loc-01", "on_hand_qty": 650, "reserved_qty": 50, "available_qty": 600, "valuation_rate": 45},
-        {"id": "bal-03", "item_id": "itm-03", "warehouse_id": "wh-01", "location_id": "loc-02", "on_hand_qty": 18, "reserved_qty": 0, "available_qty": 18, "valuation_rate": 280},
-        {"id": "bal-04", "item_id": "itm-04", "warehouse_id": "wh-01", "location_id": "loc-01", "on_hand_qty": 120, "reserved_qty": 0, "available_qty": 120, "valuation_rate": 350}
-    ]
-
-    db["indents"] = [
-        {
-            "id": "ind-1001",
-            "indent_number": "IND-2026-001001",
-            "request_date": "2026-08-18",
-            "department_id": "dept-01",
-            "requested_by": "usr-05",
-            "required_date": "2026-08-30",
-            "purpose": "New Developer Onboarding Setup",
-            "priority": "High",
-            "cost_centre_or_project": "IT-001",
-            "cost_centre": "IT-001",
-            "remarks": "Urgent laptops for new engineering team hires",
-            "status": "Submitted",
-            "total_estimated_amount": 1440000,
-            "items": [
-                {"id": "ind-item-1", "item_id": "itm-01", "item_code": "IT-LAP-0001", "item_name": "Dell Latitude 5440 Laptop", "requested_qty": 20, "approved_qty": 20, "estimated_rate": 72000, "estimated_amount": 1440000, "required_date": "2026-08-30"}
-            ],
-            "created_at": now
-        },
-        {
-            "id": "ind-1002",
-            "indent_number": "IND-2026-001002",
-            "request_date": "2026-08-17",
-            "department_id": "dept-02",
-            "requested_by": "usr-03",
-            "required_date": "2026-08-28",
-            "purpose": "Plant Floor Maintenance Spares",
-            "priority": "Normal",
-            "cost_centre_or_project": "MAINT-002",
-            "cost_centre": "MAINT-002",
-            "remarks": "Routine cabling and maintenance materials",
-            "status": "Submitted",
-            "total_estimated_amount": 180000,
-            "items": [
-                {"id": "ind-item-2", "item_id": "itm-02", "item_code": "ELE-CBL-0002", "item_name": "Cat6 Ethernet Cable (305m Drum)", "requested_qty": 4, "approved_qty": 4, "estimated_rate": 45000, "estimated_amount": 180000, "required_date": "2026-08-28"}
-            ],
-            "created_at": now
-        },
-        {
-            "id": "ind-1003",
-            "indent_number": "IND-2026-001003",
-            "request_date": "2026-08-15",
-            "department_id": "dept-01",
-            "requested_by": "usr-05",
-            "required_date": "2026-08-26",
-            "purpose": "Office Supplies & Printing Paper",
-            "priority": "Low",
-            "cost_centre_or_project": "IT-001",
-            "cost_centre": "IT-001",
-            "remarks": "Quarterly stationery replenishment",
-            "status": "Approved",
-            "total_estimated_amount": 28000,
-            "items": [
-                {"id": "ind-item-3", "item_id": "itm-03", "item_code": "OFF-PPR-0003", "item_name": "A4 Copy Paper 80GSM (Rim)", "requested_qty": 100, "approved_qty": 100, "estimated_rate": 280, "estimated_amount": 28000, "required_date": "2026-08-26"}
-            ],
-            "created_at": now
-        },
-        {
-            "id": "ind-1004",
-            "indent_number": "IND-2026-001004",
-            "request_date": "2026-08-14",
-            "department_id": "dept-02",
-            "requested_by": "usr-03",
-            "required_date": "2026-08-24",
-            "purpose": "Chemical Cleaning Solvents Batch C-40",
-            "priority": "Normal",
-            "cost_centre_or_project": "MAINT-002",
-            "cost_centre": "MAINT-002",
-            "remarks": "Specify brand preferences before approval",
-            "status": "Returned for correction",
-            "total_estimated_amount": 70000,
-            "items": [
-                {"id": "ind-item-4", "item_id": "itm-04", "item_code": "RAW-CHM-0004", "item_name": "Industrial Cleaning Solvent C-40", "requested_qty": 200, "approved_qty": 200, "estimated_rate": 350, "estimated_amount": 70000, "required_date": "2026-08-24"}
-            ],
-            "created_at": now
-        },
-        {
-            "id": "ind-1005",
-            "indent_number": "IND-2026-001005",
-            "request_date": "2026-08-12",
-            "department_id": "dept-03",
-            "requested_by": "usr-02",
-            "required_date": "2026-08-20",
-            "purpose": "Unbudgeted Executive High End Hardware",
-            "priority": "Urgent",
-            "priority_justification": "Executive request",
-            "cost_centre_or_project": "PROD-003",
-            "cost_centre": "PROD-003",
-            "remarks": "Exceeds annual department budget limits",
-            "status": "Rejected",
-            "total_estimated_amount": 850000,
-            "items": [
-                {"id": "ind-item-5", "item_id": "itm-01", "item_code": "IT-LAP-0001", "item_name": "Dell Latitude 5440 Laptop", "requested_qty": 10, "approved_qty": 0, "estimated_rate": 85000, "estimated_amount": 850000, "required_date": "2026-08-20"}
-            ],
-            "created_at": now
-        }
-    ]
-
-    db["purchase_orders"] = [
-        {
-            "id": "po-1001",
-            "po_number": "PO-2026-001001",
-            "supplier_id": "sup-01",
-            "supplier_name": "Infotech Systems Ltd",
-            "po_date": "2026-08-17",
-            "delivery_date": "2026-08-28",
-            "status": "Submitted",
-            "grand_total": 360000,
-            "payment_terms": "Net 30 days",
-            "items": [
-                {"id": "po-item-1", "item_id": "itm-01", "item_code": "IT-LAP-0001", "item_name": "Dell Latitude 5440 Laptop", "order_qty": 5, "unit_price": 72000, "total_price": 360000}
-            ],
-            "created_at": now
-        }
-    ]
+    db["indents"] = []
+    db["purchase_orders"] = []
 
     db["approval_workflows"] = [
         {
@@ -585,94 +344,9 @@ def seed_initial_data():
         }
     ]
 
-    db["approval_requests"] = [
-        {
-            "id": "app-01",
-            "transaction_type": "INDENT",
-            "transaction_id": "ind-1001",
-            "approval_level": 1,
-            "approver_id": "usr-04",
-            "assigned_date": "2026-08-18T10:00:00",
-            "status": "Pending",
-            "comments": "Awaiting Department Manager Approval"
-        },
-        {
-            "id": "app-02",
-            "transaction_type": "PURCHASE_ORDER",
-            "transaction_id": "po-1001",
-            "approval_level": 2,
-            "approver_id": "usr-04",
-            "assigned_date": "2026-08-17T14:30:00",
-            "status": "Pending",
-            "comments": "Awaiting Finance Manager sign-off for PO-2026-001001"
-        },
-        {
-            "id": "app-03",
-            "transaction_type": "INDENT",
-            "transaction_id": "ind-1002",
-            "approval_level": 1,
-            "approver_id": "usr-04",
-            "assigned_date": "2026-08-17T11:00:00",
-            "status": "Pending",
-            "comments": "Awaiting Department Manager Stock Review for cabling"
-        }
-    ]
-
-    db["approval_delegations"] = [
-        {
-            "id": "del-01",
-            "delegator_id": "usr-04",
-            "delegator_name": "Sarah Jenkins",
-            "delegatee_id": "usr-02",
-            "delegatee_name": "Jane Smith",
-            "from_user": "usr-04",
-            "to_user": "usr-02",
-            "start_date": "2026-08-15",
-            "end_date": "2026-08-31",
-            "reason": "Annual Vacation Approval Delegation",
-            "status": "Active",
-            "is_active": True
-        }
-    ]
-
-    db["approval_actions"] = [
-        {
-            "id": "act-01",
-            "approval_id": "app-03-hist",
-            "transaction_type": "INDENT",
-            "transaction_id": "ind-1003",
-            "approver_id": "usr-04",
-            "approver_name": "Sarah Jenkins",
-            "action": "Approve",
-            "status": "Approved",
-            "comments": "Approved IT hardware requisition for developer team setup.",
-            "timestamp": "2026-08-15T10:30:00"
-        },
-        {
-            "id": "act-02",
-            "approval_id": "app-04-hist",
-            "transaction_type": "INDENT",
-            "transaction_id": "ind-1004",
-            "approver_id": "usr-04",
-            "approver_name": "Sarah Jenkins",
-            "action": "Return",
-            "status": "Returned for Correction",
-            "comments": "Please specify preferred brand and technical specifications for cabling drums.",
-            "timestamp": "2026-08-14T12:00:00"
-        },
-        {
-            "id": "act-03",
-            "approval_id": "app-05-hist",
-            "transaction_type": "INDENT",
-            "transaction_id": "ind-1005",
-            "approver_id": "usr-04",
-            "approver_name": "Sarah Jenkins",
-            "action": "Reject",
-            "status": "Rejected",
-            "comments": "Exceeds annual department budget limits without senior management authorization.",
-            "timestamp": "2026-08-12T16:15:00"
-        }
-    ]
+    db["approval_requests"] = []
+    db["approval_delegations"] = []
+    db["approval_actions"] = []
 
     db["audit_logs"] = [
         {

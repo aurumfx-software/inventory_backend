@@ -6,100 +6,9 @@ from typing import Dict, Any, Optional
 
 router = APIRouter(prefix="/api", tags=["Inventory Operations"])
 
-INITIAL_GRNS = [
-    {
-        "id": "grn-1",
-        "grn_number": "GRN-2026-004002",
-        "receipt_date": "2026-08-18",
-        "po_id": "po-1",
-        "po_number": "PO-2026-003002",
-        "supplier_id": "sup-01",
-        "supplier_name": "Infotech Systems Ltd",
-        "supplier_invoice_number": "INV-INF-9988",
-        "supplier_invoice_date": "2026-08-17",
-        "delivery_challan_number": "DC-77881",
-        "vehicle_number": "KA-01-EQ-9921",
-        "warehouse_id": "wh-01",
-        "warehouse_name": "Central Goods Warehouse",
-        "received_by": "Michael Chang (Store Manager)",
-        "inspection_status": "Pending inspection",
-        "status": "Pending inspection",
-        "remarks": "Inbound shipment received at main bay. Requires quality verification.",
-        "items": [
-            {
-                "id": "grni-1-1",
-                "item_id": "itm-01",
-                "item_code": "IT-LAP-0001",
-                "item_name": "Dell Latitude 5440 Laptop",
-                "ordered_qty": 20,
-                "received_qty": 20,
-                "accepted_qty": 18,
-                "rejected_qty": 2,
-                "uom": "Pcs",
-                "unit_rate": 72000,
-                "storage_location_id": "loc-03",
-                "serial_numbers": ["SN-LAP-1001", "SN-LAP-1002"]
-            },
-            {
-                "id": "grni-1-2",
-                "item_id": "itm-02",
-                "item_code": "ELE-CBL-0002",
-                "item_name": "Cat6 Ethernet Cable (305m Drum)",
-                "ordered_qty": 10,
-                "received_qty": 10,
-                "accepted_qty": 10,
-                "rejected_qty": 0,
-                "uom": "Pcs",
-                "unit_rate": 45,
-                "storage_location_id": "loc-01",
-                "batch_number": "BAT-2026-X99"
-            }
-        ],
-        "created_at": datetime.now().isoformat()
-    },
-    {
-        "id": "grn-2",
-        "grn_number": "GRN-2026-5710",
-        "receipt_date": "2026-08-18",
-        "po_id": "po-2",
-        "po_number": "PO-2026-003003",
-        "supplier_id": "sup-02",
-        "supplier_name": "Apex Electrical Controls",
-        "supplier_invoice_number": "INV-AEC-4410",
-        "supplier_invoice_date": "2026-08-18",
-        "delivery_challan_number": "DC-5512",
-        "vehicle_number": "KA-04-MB-1122",
-        "warehouse_id": "wh-01",
-        "warehouse_name": "Central Goods Warehouse",
-        "received_by": "Michael Chang (Store Manager)",
-        "inspection_status": "Pending inspection",
-        "status": "Pending inspection",
-        "remarks": "Inbound cables received.",
-        "items": [
-            {
-                "id": "grni-2-1",
-                "item_id": "itm-02",
-                "item_code": "ELE-CBL-0002",
-                "item_name": "Cat6 Ethernet Cable (305m Drum)",
-                "ordered_qty": 50,
-                "received_qty": 50,
-                "accepted_qty": 50,
-                "rejected_qty": 0,
-                "uom": "Pcs",
-                "unit_rate": 45,
-                "storage_location_id": "loc-01"
-            }
-        ],
-        "created_at": datetime.now().isoformat()
-    }
-]
-
 @router.get("/goods-receipts")
 def get_goods_receipts():
-    if not db.get("goods_receipts"):
-        db["goods_receipts"] = INITIAL_GRNS
-        save_db()
-    return {"success": True, "data": db["goods_receipts"]}
+    return {"success": True, "data": db.get("goods_receipts", [])}
 
 @router.post("/goods-receipts")
 def create_goods_receipt(grn: GRNCreate):
@@ -167,77 +76,9 @@ def cancel_grn(grn_id: str):
             return {"success": True, "data": g}
     return {"success": False, "message": "GRN not found"}
 
-INITIAL_QUALITY_INSPECTIONS = [
-    {
-        "id": "qi-1",
-        "inspection_reference": "QI-2026-561989",
-        "inspection_number": "QI-2026-561989",
-        "grn_id": "grn-1",
-        "grn_reference": "GRN-2026-004002",
-        "supplier_name": "Infotech Systems Ltd",
-        "selected_item_id": "itm-01",
-        "item_code": "IT-LAP-0001",
-        "item_name": "Dell Latitude 5440 Laptop",
-        "inspected_by": "Michael Chang (Store Manager)",
-        "inspection_date": "2026-08-18",
-        "accepted_qty": 18,
-        "rejected_qty": 2,
-        "inspection_outcome": "Accepted with deviation",
-        "status": "Accepted with deviation",
-        "pass_fail_result": "Pass",
-        "remarks": "Minor packaging tears on 2 units. Laptops tested functional.",
-        "inspection_rows": [
-            {
-                "parameter": "Dimensions",
-                "required_spec": "14 inch display, 16GB RAM",
-                "actual_result": "14 inch display, 16GB RAM",
-                "pass_fail": "Pass"
-            },
-            {
-                "parameter": "Packaging & Physical State",
-                "required_spec": "Sealed box without damage",
-                "actual_result": "2 boxes outer carton torn",
-                "pass_fail": "Fail"
-            }
-        ],
-        "created_at": datetime.now().isoformat()
-    },
-    {
-        "id": "qi-2",
-        "inspection_reference": "QI-2026-561990",
-        "inspection_number": "QI-2026-561990",
-        "grn_id": "grn-2",
-        "grn_reference": "GRN-2026-5710",
-        "supplier_name": "Apex Electrical Controls",
-        "selected_item_id": "itm-02",
-        "item_code": "ELE-CBL-0002",
-        "item_name": "Cat6 Ethernet Cable (305m Drum)",
-        "inspected_by": "Michael Chang (Store Manager)",
-        "inspection_date": "2026-08-18",
-        "accepted_qty": 50,
-        "rejected_qty": 0,
-        "inspection_outcome": "Accepted",
-        "status": "Accepted",
-        "pass_fail_result": "Pass",
-        "remarks": "All cable drums verified for high-speed conductivity and length.",
-        "inspection_rows": [
-            {
-                "parameter": "Cable Continuity",
-                "required_spec": "Gigabit Shielded Copper 305m",
-                "actual_result": "305m verified pass",
-                "pass_fail": "Pass"
-            }
-        ],
-        "created_at": datetime.now().isoformat()
-    }
-]
-
 @router.get("/quality-inspections")
 def get_quality_inspections():
-    if not db.get("quality_inspections"):
-        db["quality_inspections"] = INITIAL_QUALITY_INSPECTIONS
-        save_db()
-    return {"success": True, "data": db["quality_inspections"]}
+    return {"success": True, "data": db.get("quality_inspections", [])}
 
 @router.post("/quality-inspections")
 def create_quality_inspection(payload: Dict[str, Any]):

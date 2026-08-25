@@ -6,61 +6,6 @@ from typing import Dict, Any, Optional
 
 router = APIRouter(prefix="/api", tags=["Procurement"])
 
-INITIAL_RFQS = [
-    {
-        "id": "rfq-1",
-        "rfq_number": "RFQ-2026-001001",
-        "rfq_date": "2026-08-15",
-        "due_date": "2026-08-30",
-        "indent_id": "ind-1001",
-        "indent_number": "IND-2026-001001",
-        "buyer": "Sarah Jenkins (Buyer)",
-        "delivery_location": "Central Goods Warehouse (WH-MAIN)",
-        "currency": "INR",
-        "terms": "Net 30 days, FOB Destination",
-        "contact_person": "Vikram Malhotra",
-        "status": "Published",
-        "created_at": datetime.now().isoformat(),
-        "items": [
-            {
-                "item_id": "itm-01",
-                "item_code": "IT-LAP-0001",
-                "item_name": "Dell Latitude 5440 Laptop",
-                "specification": "Intel i7 13th Gen, 16GB RAM, 512GB SSD, 14-inch Display",
-                "quantity": 20,
-                "unit": "Pcs",
-                "required_delivery_date": "2026-08-28"
-            }
-        ]
-    },
-    {
-        "id": "rfq-2",
-        "rfq_number": "RFQ-2026-002003",
-        "rfq_date": "2026-08-18",
-        "due_date": "2026-08-28",
-        "indent_id": "ind-1001",
-        "indent_number": "IND-2026-001001",
-        "buyer": "Rajesh Kumar (Purchase Manager)",
-        "delivery_location": "IT Store (WH-SUB1)",
-        "currency": "INR",
-        "terms": "Net 15 days",
-        "contact_person": "Suresh Menon",
-        "status": "Published",
-        "created_at": datetime.now().isoformat(),
-        "items": [
-            {
-                "item_id": "itm-02",
-                "item_code": "ELE-CBL-0002",
-                "item_name": "Cat6 Ethernet Cable (305m Drum)",
-                "specification": "High speed Gigabit Shielded Copper Cable Drum",
-                "quantity": 50,
-                "unit": "Pcs",
-                "required_delivery_date": "2026-08-28"
-            }
-        ]
-    }
-]
-
 @router.get("/rfqs/suggested-suppliers")
 def get_suggested_suppliers(item_ids: Optional[str] = None, category_id: Optional[str] = None, delivery_location: Optional[str] = None):
     suppliers = [s for s in db.get("suppliers", []) if s.get("is_active") is not False and s.get("approval_status") == "Approved"]
@@ -85,19 +30,15 @@ def get_suggested_suppliers(item_ids: Optional[str] = None, category_id: Optiona
 
 @router.get("/rfqs")
 def get_rfqs():
-    if not db.get("rfqs"):
-        db["rfqs"] = INITIAL_RFQS
-        save_db()
-        
-    # Enrich RFQs with supplier count and items count
+    rfq_list = db.get("rfqs", [])
     enriched = []
-    for rfq in db["rfqs"]:
+    for rfq in rfq_list:
         sup_ids = rfq.get("supplier_ids", [])
         suppliers = [s for s in db.get("suppliers", []) if s["id"] in sup_ids]
         enriched.append({
             **rfq,
             "suppliers": suppliers,
-            "supplier_count": len(suppliers) or len(sup_ids) or 2
+            "supplier_count": len(suppliers) or len(sup_ids)
         })
     return {"success": True, "data": enriched}
 
@@ -399,103 +340,9 @@ def compute_quotation_totals(payload: Dict[str, Any]) -> Dict[str, Any]:
         "total_landed_cost": round(total_landed_cost, 2)
     }
 
-INITIAL_QUOTATIONS = [
-    {
-        "id": "qte-01",
-        "quotation_number": "QTN-2026-000001",
-        "rfq_id": "rfq-1",
-        "rfq_number": "RFQ-2026-001001",
-        "supplier_id": "sup-01",
-        "supplier_name": "Infotech Systems Ltd",
-        "supplier_quotation_ref": "INF/QT/2026/88",
-        "quotation_date": "2026-08-15",
-        "valid_until_date": "2026-09-15",
-        "currency": "INR",
-        "payment_terms": "Net 30 days",
-        "delivery_terms": "FOB Destination",
-        "freight_terms": "Freight Prepaid",
-        "warranty": "3 Years Onsite Warranty",
-        "attachment": "Infotech_Official_Quote_2026.pdf",
-        "remarks": "Special enterprise volume discount included.",
-        "subtotal": 1220338.98,
-        "tax_total": 219661.02,
-        "freight_total": 0,
-        "total_landed_cost": 1440000,
-        "status": "Approved",
-        "is_selected": True,
-        "items": [
-            {
-                "item_id": "itm-01",
-                "item_code": "IT-LAP-0001",
-                "item_name": "Dell Latitude 5440 Laptop",
-                "offered_brand": "Dell Technologies",
-                "offered_quantity": 20,
-                "unit_rate": 72000,
-                "discount_pct": 0,
-                "discount_amount": 0,
-                "taxable_amount": 1440000,
-                "tax_pct": 18,
-                "tax_amount": 259200,
-                "freight_amount": 0,
-                "line_total": 1440000,
-                "delivery_days": 7,
-                "item_warranty": "3 Years Onsite Warranty",
-                "technical_compliance": "Compliant"
-            }
-        ]
-    },
-    {
-        "id": "qte-02",
-        "quotation_number": "QTN-2026-000002",
-        "rfq_id": "rfq-1",
-        "rfq_number": "RFQ-2026-001001",
-        "supplier_id": "sup-02",
-        "supplier_name": "Apex Electrical Controls",
-        "supplier_quotation_ref": "AEC/QUOTE/55",
-        "quotation_date": "2026-08-16",
-        "valid_until_date": "2026-09-16",
-        "currency": "INR",
-        "payment_terms": "Net 15 days",
-        "delivery_terms": "FOB Destination",
-        "freight_terms": "Freight Prepaid",
-        "warranty": "2 Years Standard",
-        "attachment": "Apex_Quote_Commercial.pdf",
-        "remarks": "Faster 5-day dispatch lead time.",
-        "subtotal": 1254237.29,
-        "tax_total": 225762.71,
-        "freight_total": 0,
-        "total_landed_cost": 1480000,
-        "status": "Received",
-        "is_selected": False,
-        "items": [
-            {
-                "item_id": "itm-01",
-                "item_code": "IT-LAP-0001",
-                "item_name": "Dell Latitude 5440 Laptop",
-                "offered_brand": "Dell Technologies",
-                "offered_quantity": 20,
-                "unit_rate": 74000,
-                "discount_pct": 0,
-                "discount_amount": 0,
-                "taxable_amount": 1480000,
-                "tax_pct": 18,
-                "tax_amount": 266400,
-                "freight_amount": 0,
-                "line_total": 1480000,
-                "delivery_days": 5,
-                "item_warranty": "2 Years Standard Warranty",
-                "technical_compliance": "Compliant"
-            }
-        ]
-    }
-]
-
 @router.get("/quotations")
 def get_quotations():
-    if not db.get("quotations"):
-        db["quotations"] = INITIAL_QUOTATIONS
-        save_db()
-    return {"success": True, "data": db["quotations"]}
+    return {"success": True, "data": db.get("quotations", [])}
 
 @router.get("/quotations/{qte_id}")
 def get_quotation(qte_id: str):
@@ -506,8 +353,8 @@ def get_quotation(qte_id: str):
 
 @router.post("/quotations")
 def create_quotation(payload: Dict[str, Any]):
-    if not db.get("quotations"):
-        db["quotations"] = INITIAL_QUOTATIONS
+    if "quotations" not in db:
+        db["quotations"] = []
 
     # Perform mandatory backend calculations
     calc = compute_quotation_totals(payload)
