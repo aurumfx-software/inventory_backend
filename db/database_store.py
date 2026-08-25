@@ -55,8 +55,8 @@ db = {
     "settings": {}
 }
 
-def save_db():
-    """Save/Persist current database state directly to PostgreSQL database tables."""
+def save_db(target_table: str = None):
+    """Save/Persist current database state directly to PostgreSQL database tables with high performance."""
     try:
         from db.database import check_db_connection, SessionLocal, engine, Base
         from models.orm_models import TABLE_MODEL_MAP, SystemSetting
@@ -65,25 +65,27 @@ def save_db():
             print("[DB ERROR] Cannot save: PostgreSQL database connection is offline. Check .env credentials.")
             return
 
-        Base.metadata.create_all(bind=engine)
         session = SessionLocal()
         try:
-            # Sync settings to PostgreSQL
-            if "settings" in db and isinstance(db["settings"], dict):
-                for key, val in db["settings"].items():
-                    setting_obj = session.query(SystemSetting).filter_by(key=key).first()
-                    payload_val = val if isinstance(val, (dict, list)) else {"value": val}
-                    if not setting_obj:
-                        setting_obj = SystemSetting(key=key, payload=payload_val)
-                        session.add(setting_obj)
-                    else:
-                        setting_obj.payload = payload_val
+            # If target_table specified, sync only that table for maximum speed
+            tables_to_sync = [target_table] if target_table and target_table in TABLE_MODEL_MAP else list(TABLE_MODEL_MAP.keys())
 
-            # Sync all domain tables to PostgreSQL
-            for table_name, model_cls in TABLE_MODEL_MAP.items():
+            # Sync settings to PostgreSQL if full sync or target_table == 'settings'
+            if (not target_table or target_table == "settings") and "settings" in db and isinstance(db["settings"], dict):
+                for key, val in db["settings"].items():
+                    payload_val = val if isinstance(val, (dict, list)) else {"value": val}
+                    session.merge(SystemSetting(key=key, payload=payload_val))
+
+            # Fast sync specified domain tables to PostgreSQL
+            for table_name in tables_to_sync:
+                model_cls = TABLE_MODEL_MAP.get(table_name)
+                if not model_cls:
+                    continue
+
                 records = db.get(table_name, [])
                 if not isinstance(records, list):
                     continue
+
                 current_ids = set()
                 for idx, item in enumerate(records):
                     if isinstance(item, dict):
@@ -94,21 +96,16 @@ def save_db():
                         payload_val = {"id": str(item), "name": str(item)}
 
                     current_ids.add(item_id)
-                    existing = session.query(model_cls).filter_by(id=item_id).first()
-                    if not existing:
-                        obj = model_cls(id=item_id, payload=payload_val)
-                        session.add(obj)
-                    else:
-                        existing.payload = payload_val
-                        from sqlalchemy.orm.attributes import flag_modified
-                        flag_modified(existing, "payload")
+                    session.merge(model_cls(id=item_id, payload=payload_val))
 
+                # Clean up deleted records
                 if current_ids:
                     session.query(model_cls).filter(~model_cls.id.in_(current_ids)).delete(synchronize_session=False)
                 else:
                     session.query(model_cls).delete(synchronize_session=False)
+
             session.commit()
-            print("[DB SUCCESS] Database state saved to PostgreSQL successfully.")
+            print(f"[DB SUCCESS] Database state saved to PostgreSQL ({target_table or 'all tables'}) successfully.")
         except Exception as pg_err:
             session.rollback()
             import traceback
