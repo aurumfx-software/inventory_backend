@@ -18,12 +18,14 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 
-# Engine setup
+# Engine setup with connection pool optimization for DigitalOcean Managed PostgreSQL
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20
+    pool_size=3,
+    max_overflow=5,
+    pool_recycle=300,
+    pool_timeout=10
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
