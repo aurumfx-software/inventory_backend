@@ -5,6 +5,14 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class RegisterRequest(BaseModel):
+    full_name: str
+    company_name: Optional[str] = ""
+    email: str
+    phone: Optional[str] = ""
+    role_id: Optional[str] = "role-admin"
+    password: str
+
 class RoleSwitchRequest(BaseModel):
     role_id: str
 

@@ -1,10 +1,16 @@
-from fastapi import APIRouter
-from db.database_store import db, save_db, get_next_doc_number
+from fastapi import APIRouter, Request, Header
+from db.database_store import db, save_db, get_next_doc_number, filter_by_company, filter_by_user_or_company
 from schemas.schemas import POCreate
 from datetime import datetime
 from typing import Dict, Any, Optional
 
 router = APIRouter(prefix="/api", tags=["Procurement"])
+
+def get_auth_context(request: Request, x_user_email: str = None, x_company_name: str = None, x_user_role: str = None):
+    email = x_user_email or request.headers.get("x-user-email") or request.query_params.get("user_email") or ""
+    company = x_company_name or request.headers.get("x-company-name") or request.query_params.get("company_name") or "Organization"
+    role = x_user_role or request.headers.get("x-user-role") or request.query_params.get("role_id") or ""
+    return email, company, role
 
 @router.get("/rfqs/suggested-suppliers")
 def get_suggested_suppliers(item_ids: Optional[str] = None, category_id: Optional[str] = None, delivery_location: Optional[str] = None):
@@ -29,8 +35,9 @@ def get_suggested_suppliers(item_ids: Optional[str] = None, category_id: Optiona
     return {"success": True, "data": suggested}
 
 @router.get("/rfqs")
-def get_rfqs():
-    rfq_list = db.get("rfqs", [])
+def get_rfqs(request: Request, x_user_email: str = Header(None), x_company_name: str = Header(None), x_user_role: str = Header(None)):
+    email, company, role = get_auth_context(request, x_user_email, x_company_name, x_user_role)
+    rfq_list = filter_by_user_or_company(db.get("rfqs", []), email, company, role)
     enriched = []
     for rfq in rfq_list:
         sup_ids = rfq.get("supplier_ids", [])
@@ -43,9 +50,10 @@ def get_rfqs():
     return {"success": True, "data": enriched}
 
 @router.post("/rfqs")
-def create_or_update_rfq(payload: Dict[str, Any]):
-    if not db.get("rfqs"):
-        db["rfqs"] = INITIAL_RFQS
+def create_or_update_rfq(payload: Dict[str, Any], request: Request, x_user_email: str = Header(None), x_company_name: str = Header(None)):
+    email, company, role = get_auth_context(request, x_user_email, x_company_name, None)
+    if "rfqs" not in db:
+        db["rfqs"] = []
 
     rfq_id = payload.get("id")
     now_iso = datetime.now().isoformat()
@@ -86,7 +94,7 @@ def create_or_update_rfq(payload: Dict[str, Any]):
                 "items": processed_items,
                 "updated_at": now_iso
             })
-            save_db()
+            save_db("rfqs")
             return {"success": True, "data": rfq, "message": "RFQ updated successfully with snapshot preserved."}
 
     # Create New RFQ
@@ -94,21 +102,25 @@ def create_or_update_rfq(payload: Dict[str, Any]):
     new_rfq = {
         "id": f"rfq-{len(db['rfqs']) + 1001}",
         "rfq_number": rfq_num,
+        "company_name": company,
+        "created_by": email,
+        "is_sample": False,
         "rfq_date": payload.get("rfq_date") or datetime.now().strftime("%Y-%m-%d"),
         "closing_date": payload.get("closing_date") or datetime.now().strftime("%Y-%m-%d"),
         "buyer": payload.get("buyer", "Sarah Jenkins (Super Administrator)"),
-        "delivery_location": payload.get("delivery_location", "Central Goods Warehouse, Main Branch"),
-        "currency": payload.get("currency", "INR"),
-        "terms": payload.get("terms", "FOB Destination, Payment Net 30 days after GRN approval."),
-        "contact_person": payload.get("contact_person", "Sarah Jenkins (procurement@company.com)"),
-        "source_indent_numbers": payload.get("source_indent_numbers", ["IND-2026-001001"]),
-        "supplier_ids": payload.get("supplier_ids", ["sup-01", "sup-02"]),
-        "status": payload.get("status", "Draft"),
-        "attachments": payload.get("attachments", []),
+        "delivery_location": payload.get("delivery_location") or "Central Goods Warehouse (WH-MAIN)",
+        "currency": payload.get("currency") or "INR",
+        "terms": payload.get("terms") or "Standard payment terms 30 days upon delivery",
+        "contact_person": payload.get("contact_person") or "Purchasing Manager",
+        "status": payload.get("status") or "Published",
+        "source_indent_numbers": payload.get("source_indent_numbers") or [],
+        "supplier_ids": payload.get("supplier_ids") or [],
+        "attachments": payload.get("attachments") or [],
         "items": processed_items,
         "created_at": now_iso
     }
     db["rfqs"].append(new_rfq)
+    save_db("rfqs")
 
     # Log Audit
     db["audit_logs"].append({
@@ -218,12 +230,10 @@ def delete_rfq(rfq_id: str):
 
 @router.get("/rfqs/{rfq_id}/comparison")
 def get_rfq_comparison(rfq_id: str):
-    if not db.get("rfqs"):
-        db["rfqs"] = INITIAL_RFQS
-        save_db()
-    if not db.get("quotations"):
-        db["quotations"] = INITIAL_QUOTATIONS
-        save_db()
+    if "rfqs" not in db:
+        db["rfqs"] = []
+    if "quotations" not in db:
+        db["quotations"] = []
 
     rfq = next((r for r in db["rfqs"] if r["id"] == rfq_id or r.get("rfq_number") == rfq_id), db["rfqs"][0] if db["rfqs"] else None)
 
@@ -470,11 +480,14 @@ def select_winning_quotation(rfq_id: str, payload: Dict[str, Any]):
 # PURCHASE ORDER MANAGEMENT
 # =========================================================================
 @router.get("/purchase-orders")
-def get_purchase_orders():
-    return {"success": True, "data": db.get("purchase_orders", [])}
+def get_purchase_orders(request: Request, x_user_email: str = Header(None), x_company_name: str = Header(None), x_user_role: str = Header(None)):
+    email, company, role = get_auth_context(request, x_user_email, x_company_name, x_user_role)
+    data = filter_by_user_or_company(db.get("purchase_orders", []), email, company, role)
+    return {"success": True, "data": data}
 
 @router.post("/purchase-orders")
-def create_purchase_order(payload: Dict[str, Any]):
+def create_purchase_order(payload: Dict[str, Any], request: Request, x_user_email: str = Header(None), x_company_name: str = Header(None)):
+    email, company, role = get_auth_context(request, x_user_email, x_company_name, None)
     po_num = payload.get("po_number") or get_next_doc_number("PO")
     sup_id = payload.get("supplier_id", "")
     sup = next((s for s in db.get("suppliers", []) if s["id"] == sup_id), None)
@@ -501,56 +514,57 @@ def create_purchase_order(payload: Dict[str, Any]):
         tax_total += tax_val
 
         processed_items.append({
-            "po_item_id": f"poi-{len(db.get('purchase_orders', [])) + 1}-{idx + 1}",
-            "item_id": item.get("item_id", ""),
-            "item_code": item.get("item_code", "ITM-CODE"),
-            "item_name": item.get("description_snapshot") or item.get("item_name", "Item"),
-            "description_snapshot": item.get("description_snapshot", ""),
+            "id": item.get("id") or f"poi-{idx+1}",
+            "item_id": item.get("item_id"),
+            "item_code": item.get("item_code"),
+            "item_name": item.get("item_name"),
             "ordered_quantity": ord_qty,
-            "received_quantity": float(item.get("received_quantity", 0)),
-            "pending_quantity": float(item.get("pending_quantity", ord_qty)),
-            "unit": item.get("unit", "Pcs"),
-            "uom": item.get("unit", "Pcs"),
             "unit_rate": unit_rate,
             "discount": disc_pct,
             "tax": tax_pct,
-            "line_total": line_total,
-            "delivery_date": item.get("delivery_date", datetime.now().strftime("%Y-%m-%d")),
-            "warehouse_id": item.get("warehouse_id", "wh-01")
+            "gross_amount": gross,
+            "discount_amount": disc_val,
+            "taxable_amount": taxable,
+            "tax_amount": tax_val,
+            "line_total": line_total
         })
 
-    grand_total = payload.get("grand_total") or (subtotal + tax_total) or payload.get("total_amount", 0)
+    total_amt = subtotal + tax_total
 
     new_po = {
-        "id": f"po-{len(db.get('purchase_orders', [])) + 1}",
+        "id": f"po-{len(db['purchase_orders']) + 1001}",
         "po_number": po_num,
-        "po_date": payload.get("po_date", datetime.now().strftime("%Y-%m-%d")),
+        "company_name": company,
+        "created_by": email,
+        "is_sample": False,
         "supplier_id": sup_id,
         "supplier_name": sup_name,
-        "supplier_address": payload.get("supplier_address") or (sup.get("address_registered") if sup else ""),
-        "billing_address": payload.get("billing_address", "Apex Enterprises HQ, 100 Industrial Park, Zone 4, Bangalore"),
-        "delivery_address": payload.get("delivery_address", "Central Goods Warehouse (WH-MAIN), Gate 2, Bangalore"),
+        "supplier_address": payload.get("supplier_address", ""),
+        "billing_address": payload.get("billing_address", ""),
+        "delivery_address": payload.get("delivery_address", ""),
         "currency": payload.get("currency", "INR"),
-        "payment_terms": payload.get("payment_terms", "Net 30 days"),
-        "delivery_terms": payload.get("delivery_terms", "FOB Destination"),
-        "freight_terms": payload.get("freight_terms", "Freight Prepaid"),
-        "buyer": payload.get("buyer", "Sarah Jenkins (Buyer)"),
+        "payment_terms": payload.get("payment_terms", ""),
+        "delivery_terms": payload.get("delivery_terms", ""),
+        "freight_terms": payload.get("freight_terms", ""),
+        "buyer": payload.get("buyer") or "Purchase Officer",
         "quotation_id": payload.get("quotation_id", ""),
         "quotation_number": payload.get("quotation_number", ""),
         "rfq_id": payload.get("rfq_id", ""),
         "indent_id": payload.get("indent_id", ""),
-        "terms_conditions": payload.get("terms_conditions", "Standard purchase terms apply."),
-        "status": payload.get("status", "Draft"),
+        "indent_number": payload.get("indent_number", ""),
+        "terms_conditions": payload.get("terms_conditions", ""),
+        "po_date": payload.get("po_date") or datetime.now().strftime("%Y-%m-%d"),
+        "delivery_date": payload.get("delivery_date") or datetime.now().strftime("%Y-%m-%d"),
+        "warehouse_id": payload.get("warehouse_id") or "wh-01",
         "subtotal": subtotal,
         "tax_total": tax_total,
-        "grand_total": grand_total,
-        "total_amount": grand_total,
-        "version_number": 1,
+        "total_amount": total_amt,
+        "status": payload.get("status") or "Approved",
         "items": processed_items,
         "created_at": datetime.now().isoformat()
     }
     db["purchase_orders"].append(new_po)
-    save_db()
+    save_db("purchase_orders")
     return {"success": True, "data": new_po, "message": f"Purchase Order {po_num} created successfully."}
 
 @router.get("/purchase-orders/{po_id}")

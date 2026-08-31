@@ -50,19 +50,19 @@ db = {
     "stock_count_entries": [],
     "stock_reservations": [],
     "assets": [],
-    "notifications": [],
-    "audit_logs": [],
     "settings": {}
 }
 
+
+
 def save_db(target_table: str = None):
-    """Save/Persist current database state directly to PostgreSQL database tables with high performance."""
+    """Save/Persist current database state exclusively to PostgreSQL database tables configured in .env."""
     try:
         from db.database import check_db_connection, SessionLocal, engine, Base
         from models.orm_models import TABLE_MODEL_MAP, SystemSetting
 
         if not check_db_connection():
-            print("[DB ERROR] Cannot save: PostgreSQL database connection is offline. Check .env credentials.")
+            print("[DB ERROR] PostgreSQL database connection is offline. Unable to save state.")
             return
 
         session = SessionLocal()
@@ -105,19 +105,19 @@ def save_db(target_table: str = None):
                     session.query(model_cls).delete(synchronize_session=False)
 
             session.commit()
-            print(f"[DB SUCCESS] Database state saved to PostgreSQL ({target_table or 'all tables'}) successfully.")
+            print(f"[POSTGRES DB SUCCESS] Saved state to PostgreSQL table '{target_table or 'all tables'}' successfully.")
         except Exception as pg_err:
             session.rollback()
             import traceback
             traceback.print_exc()
-            print("[DB ERROR] Error saving to PostgreSQL database:", pg_err)
+            print("[POSTGRES DB ERROR] Error saving to PostgreSQL database:", pg_err)
         finally:
             session.close()
     except Exception as err:
-        print("[DB ERROR] Failed to connect to PostgreSQL:", err)
+        print("[POSTGRES DB ERROR] Failed to connect to PostgreSQL:", err)
 
 def purge_all_sample_data():
-    """Wipe out all sample records (items, suppliers, departments, warehouses, categories, brands, indents, POs, approvals, etc.) for a 100% fresh system."""
+    """Wipe out all sample records for a 100% fresh system in PostgreSQL."""
     global db
     tables_to_purge = [
         "items", "item_batches", "item_serials", "inventory_balances", "inventory_ledger",
@@ -146,17 +146,17 @@ def purge_all_sample_data():
                     if model_cls:
                         session.query(model_cls).delete(synchronize_session=False)
                 session.commit()
-                print("[DB PURGE] All sample items, suppliers, departments, warehouses, and transactions permanently purged from PostgreSQL.")
+                print("[POSTGRES DB PURGE] All sample data permanently purged from PostgreSQL tables.")
             except Exception as e:
                 session.rollback()
-                print("[DB ERROR] Failed purging sample data:", e)
+                print("[POSTGRES DB ERROR] Failed purging sample data:", e)
             finally:
                 session.close()
     except Exception as err:
-        print("[DB ERROR] Purge connect error:", err)
+        print("[POSTGRES DB ERROR] Purge connect error:", err)
 
 def load_db():
-    """Load database state exclusively from PostgreSQL database tables."""
+    """Load database state exclusively from PostgreSQL database tables configured via .env."""
     global db
 
     try:
@@ -164,9 +164,7 @@ def load_db():
         from models.orm_models import TABLE_MODEL_MAP, SystemSetting
 
         if not check_db_connection():
-            print("[DB WARN] PostgreSQL database is not accessible. Seeding in-memory state until PostgreSQL connects.")
-            if not db.get("users"):
-                seed_initial_data()
+            print("[POSTGRES DB WARN] PostgreSQL database is not accessible. Please check backend/.env configuration.")
             return db
 
         Base.metadata.create_all(bind=engine)
@@ -190,37 +188,21 @@ def load_db():
                 if rows:
                     db[table_name] = [r.payload for r in rows if r.payload]
                     loaded_any = True
+                else:
+                    db[table_name] = []
 
             if not loaded_any:
-                print("[DB INFO] PostgreSQL database is empty. Seeding initial data directly into PostgreSQL...")
-                seed_initial_data()
-                save_db()
+                print("[POSTGRES DB INFO] PostgreSQL database tables are empty.")
             else:
-                print("[DB SUCCESS] Database state loaded strictly from PostgreSQL database.")
-
-            # Force purge all sample items, suppliers, departments, warehouses, and transactions to ensure 100% fresh software
-            purge_all_sample_data()
-
-            # Always preserve default system login accounts
-            if not db.get("users"):
-                db["users"] = [
-                    {"id": "usr-01", "name": "Sarah Jenkins", "email": "admin@company.com", "password": "password123", "role_id": "role-admin", "emp_code": "EMP-001", "department_id": "dept-01", "branch_id": "br-01", "is_active": True},
-                    {"id": "usr-02", "name": "Rajesh Kumar", "email": "purchase@company.com", "password": "password123", "role_id": "role-purchase", "emp_code": "EMP-002", "department_id": "dept-02", "branch_id": "br-01", "is_active": True},
-                    {"id": "usr-03", "name": "Michael Chang", "email": "store@company.com", "password": "password123", "role_id": "role-store", "emp_code": "EMP-003", "department_id": "dept-03", "branch_id": "br-01", "is_active": True},
-                    {"id": "usr-04", "name": "Dr. Ananya Roy", "email": "deptmgr@company.com", "password": "password123", "role_id": "role-dept-mgr", "emp_code": "EMP-004", "department_id": "dept-01", "branch_id": "br-01", "is_active": True},
-                    {"id": "usr-05", "name": "David Miller", "email": "requester@company.com", "password": "password123", "role_id": "role-requester", "emp_code": "EMP-005", "department_id": "dept-01", "branch_id": "br-01", "is_active": True},
-                    {"id": "usr-06", "name": "Priya Sharma", "email": "finance@company.com", "password": "password123", "role_id": "role-finance", "emp_code": "EMP-006", "department_id": "dept-04", "branch_id": "br-01", "is_active": True},
-                    {"id": "usr-07", "name": "Robert Wilson", "email": "auditor@company.com", "password": "password123", "role_id": "role-auditor", "emp_code": "EMP-007", "department_id": "dept-04", "branch_id": "br-01", "is_active": True}
-                ]
-                save_db()
+                print("[POSTGRES DB SUCCESS] Loaded all state exclusively from PostgreSQL database tables.")
 
             return db
         except Exception as pg_load_err:
-            print("[DB ERROR] Error loading from PostgreSQL:", pg_load_err)
+            print("[POSTGRES DB ERROR] Error loading from PostgreSQL:", pg_load_err)
         finally:
             session.close()
     except Exception as err:
-        print("[DB ERROR] Failed PostgreSQL database load:", err)
+        print("[POSTGRES DB ERROR] Failed PostgreSQL database load:", err)
 
     return db
 
@@ -278,15 +260,7 @@ def seed_initial_data():
         "audit.view", "settings.edit"
     ]
 
-    db["users"] = [
-        {"id": "usr-01", "name": "Sarah Jenkins", "email": "admin@company.com", "password": "password123", "role_id": "role-admin", "emp_code": "EMP-001", "department_id": "dept-01", "branch_id": "br-01", "is_active": True},
-        {"id": "usr-02", "name": "Rajesh Kumar", "email": "purchase@company.com", "password": "password123", "role_id": "role-purchase", "emp_code": "EMP-002", "department_id": "dept-02", "branch_id": "br-01", "is_active": True},
-        {"id": "usr-03", "name": "Michael Chang", "email": "store@company.com", "password": "password123", "role_id": "role-store", "emp_code": "EMP-003", "department_id": "dept-03", "branch_id": "br-01", "is_active": True},
-        {"id": "usr-04", "name": "Dr. Ananya Roy", "email": "deptmgr@company.com", "password": "password123", "role_id": "role-dept-mgr", "emp_code": "EMP-004", "department_id": "dept-01", "branch_id": "br-01", "is_active": True},
-        {"id": "usr-05", "name": "David Miller", "email": "requester@company.com", "password": "password123", "role_id": "role-requester", "emp_code": "EMP-005", "department_id": "dept-01", "branch_id": "br-01", "is_active": True},
-        {"id": "usr-06", "name": "Priya Sharma", "email": "finance@company.com", "password": "password123", "role_id": "role-finance", "emp_code": "EMP-006", "department_id": "dept-04", "branch_id": "br-01", "is_active": True},
-        {"id": "usr-07", "name": "Robert Wilson", "email": "auditor@company.com", "password": "password123", "role_id": "role-auditor", "emp_code": "EMP-007", "department_id": "dept-04", "branch_id": "br-01", "is_active": True}
-    ]
+    db["users"] = []
 
     db["departments"] = []
     db["warehouses"] = []
@@ -316,6 +290,7 @@ def seed_initial_data():
 
     db["indents"] = []
     db["purchase_orders"] = []
+    db["stock_count_sessions"] = []
 
     db["approval_workflows"] = [
         {
@@ -360,14 +335,100 @@ def seed_initial_data():
 
     db["audit_logs"] = [
         {
-            "id": "aud-01",
-            "user_id": "usr-01",
-            "action": "SYSTEM_INIT",
-            "module": "SYSTEM",
-            "record_id": "SYS-001",
-            "details": "Standalone Python FastAPI Database seeded successfully",
+            "id": "aud-101",
             "timestamp": now,
-            "ip_address": "127.0.0.1"
+            "user_id": "usr-01",
+            "user_name": "System Administrator",
+            "action": "LOGIN_SUCCESS",
+            "category": "Authentication",
+            "module": "Authentication",
+            "record_id": "usr-01",
+            "ip_address": "127.0.0.1",
+            "device_browser": "Chrome / Windows",
+            "details": "User System Administrator logged in successfully with MFA authorization.",
+            "old_value": None,
+            "new_value": {"session_token": "jwt-masked", "login_time": now},
+            "reason": "Normal Application Sign-in"
+        },
+        {
+            "id": "aud-102",
+            "timestamp": now,
+            "user_id": "usr-02",
+            "user_name": "Purchase Manager",
+            "action": "PO_CREATED",
+            "category": "Record Changes",
+            "module": "Purchase Orders",
+            "record_id": "PO-2026-000045",
+            "ip_address": "127.0.0.1",
+            "device_browser": "Firefox / macOS",
+            "details": "Created formal Purchase Order PO-2026-000045 for Approved Vendor.",
+            "old_value": None,
+            "new_value": {"po_number": "PO-2026-000045", "total_amount": 144000},
+            "reason": "Procurement against Approved Indent"
+        },
+        {
+            "id": "aud-103",
+            "timestamp": now,
+            "user_id": "usr-03",
+            "user_name": "Store Manager",
+            "action": "STOCK_POSTED",
+            "category": "Approvals & Stock Posting",
+            "module": "Goods Receipts (GRN)",
+            "record_id": "GRN-2026-004018",
+            "ip_address": "127.0.0.1",
+            "device_browser": "Edge / Windows",
+            "details": "Posted Goods Receipt GRN-2026-004018 into Warehouse stock.",
+            "old_value": {"available_qty": 0, "reserved_qty": 0},
+            "new_value": {"available_qty": 25, "reserved_qty": 0},
+            "reason": "Physical delivery verified & quality inspection passed"
+        },
+        {
+            "id": "aud-104",
+            "timestamp": now,
+            "user_id": "usr-04",
+            "user_name": "Department Manager",
+            "action": "INDENT_APPROVED",
+            "category": "Approvals & Stock Posting",
+            "module": "Indent Management",
+            "record_id": "IND-2026-000124",
+            "ip_address": "127.0.0.1",
+            "device_browser": "Safari / macOS",
+            "details": "Approved material indent request for required store items.",
+            "old_value": {"status": "Submitted"},
+            "new_value": {"status": "Approved", "approved_by": "Department Manager"},
+            "reason": "Department budget allocation verified & within limits"
+        },
+        {
+            "id": "aud-105",
+            "timestamp": now,
+            "user_id": "usr-01",
+            "user_name": "System Administrator",
+            "action": "RECORD_DELETED",
+            "category": "Deletions & Permissions",
+            "module": "Item Master",
+            "record_id": "itm-099",
+            "ip_address": "127.0.0.1",
+            "device_browser": "Chrome / Windows",
+            "details": "Permanently deleted obsolete item master record.",
+            "old_value": {"item_code": "IT-MON-0099", "status": "Active"},
+            "new_value": None,
+            "reason": "Obsolete item purge requested"
+        },
+        {
+            "id": "aud-106",
+            "timestamp": now,
+            "user_id": "usr-07",
+            "user_name": "Auditor",
+            "action": "REPORT_EXPORTED",
+            "category": "Report Exports",
+            "module": "Reports & Analytics",
+            "record_id": "REP-VAL-2026",
+            "ip_address": "127.0.0.1",
+            "device_browser": "Chrome / Windows",
+            "details": "Exported Financial Valuation & Stock Balance Summary Report.",
+            "old_value": None,
+            "new_value": {"report_name": "Stock Valuation Report", "format": "PDF"},
+            "reason": "Quarterly Audit Compliance Check"
         }
     ]
 
@@ -384,6 +445,46 @@ def get_next_doc_number(doc_type: str) -> str:
     
     year = datetime.now().year
     return f"{doc_type}-{year}-{str(next_val).zfill(6)}"
+
+def filter_by_company(records: list, company_name: str = None) -> list:
+    """
+    Strict Multi-Tenant Data Isolation helper:
+    Filters database records by company_name.
+    """
+    if not company_name or str(company_name).strip().lower() in ["system administrator", "admin", "super administrator", "none", "null", ""]:
+        return records
+    
+    target_co = str(company_name).strip().lower()
+    return [
+        r for r in records
+        if str(r.get("company_name", "")).strip().lower() == target_co
+        or str(r.get("company", "")).strip().lower() == target_co
+    ]
+
+def filter_by_user_or_company(records: list, user_email: str = None, company_name: str = None, role_id: str = None) -> list:
+    """
+    Strict User & Tenant Data Isolation Helper:
+    - Master Super Administrator (admin@company.com) sees all records across all users.
+    - Individual users (e.g. Ashin, Ramu) see records created by themselves or under their company.
+    """
+    clean_email = str(user_email or "").strip().lower()
+    clean_co = str(company_name or "").strip().lower()
+
+    if clean_email in ["admin@company.com", "system administrator", "admin"]:
+        return records
+
+    if not clean_email and not clean_co:
+        return records
+
+    filtered = []
+    for r in records:
+        created_by = str(r.get("created_by", "") or r.get("created_by_email", "") or r.get("user_email", "")).strip().lower()
+        record_co = str(r.get("company_name", "") or r.get("company", "")).strip().lower()
+        is_sample = r.get("is_sample", False) or r.get("is_global", False)
+
+        if is_sample or (clean_email and created_by == clean_email) or (clean_co and record_co and record_co == clean_co):
+            filtered.append(r)
+    return filtered
 
 # Load database on import
 load_db()

@@ -63,7 +63,7 @@ def enrich_approval_request(app_req: dict) -> dict:
     
     return {
         **app_req,
-        "approver_name": approver.get("name", "Sarah Jenkins (Department Manager)"),
+        "approver_name": app_req.get("approver_name") or approver.get("name") or "Department Manager",
         "txnDetails": txnDetails
     }
 
@@ -228,7 +228,7 @@ def take_approval_action(req: ApprovalAction, approval_id: Optional[str] = None)
         "transaction_type": txn_type,
         "transaction_id": txn_id,
         "approver_id": req.user_id or app_req.get("approver_id", "usr-04"),
-        "approver_name": req.user_name or "Sarah Jenkins (Department Manager)",
+        "approver_name": req.user_name or "Department Manager",
         "action": req.action,
         "status": new_status,
         "comments": req.comments or "",

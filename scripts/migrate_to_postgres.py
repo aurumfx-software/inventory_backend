@@ -1,6 +1,5 @@
 import os
 import sys
-import json
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -36,16 +35,10 @@ def run_migration():
 
     # 3. Seed data directly from database_store seed definition
     from db.database_store import seed_initial_data, db as memory_db
-    db_json_path = os.path.join(backend_dir, "db", "inventory_store.json")
 
-    if os.path.exists(db_json_path):
-        print(f"Loading seed data from {db_json_path}...")
-        with open(db_json_path, "r", encoding="utf-8") as f:
-            data_store = json.load(f)
-    else:
-        print("Initializing seed data into PostgreSQL directly...")
-        seed_initial_data()
-        data_store = memory_db
+    print("Initializing seed data into PostgreSQL directly...")
+    seed_initial_data()
+    data_store = memory_db
 
 
     session = SessionLocal()

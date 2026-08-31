@@ -1,21 +1,33 @@
-from fastapi import APIRouter
-from db.database_store import db, save_db, get_next_doc_number
+from fastapi import APIRouter, Request, Header
+from db.database_store import db, save_db, get_next_doc_number, filter_by_company, filter_by_user_or_company
 from schemas.schemas import GRNCreate
 from datetime import datetime
 from typing import Dict, Any, Optional
 
 router = APIRouter(prefix="/api", tags=["Inventory Operations"])
 
+def get_auth_context(request: Request, x_user_email: str = None, x_company_name: str = None, x_user_role: str = None):
+    email = x_user_email or request.headers.get("x-user-email") or request.query_params.get("user_email") or ""
+    company = x_company_name or request.headers.get("x-company-name") or request.query_params.get("company_name") or "Organization"
+    role = x_user_role or request.headers.get("x-user-role") or request.query_params.get("role_id") or ""
+    return email, company, role
+
 @router.get("/goods-receipts")
-def get_goods_receipts():
-    return {"success": True, "data": db.get("goods_receipts", [])}
+def get_goods_receipts(request: Request, x_user_email: str = Header(None), x_company_name: str = Header(None), x_user_role: str = Header(None)):
+    email, company, role = get_auth_context(request, x_user_email, x_company_name, x_user_role)
+    data = filter_by_user_or_company(db.get("goods_receipts", []), email, company, role)
+    return {"success": True, "data": data}
 
 @router.post("/goods-receipts")
-def create_goods_receipt(grn: GRNCreate):
+def create_goods_receipt(grn: GRNCreate, request: Request, x_user_email: str = Header(None), x_company_name: str = Header(None)):
+    email, company, role = get_auth_context(request, x_user_email, x_company_name, None)
     grn_num = get_next_doc_number("GRN")
     new_grn = {
         "id": f"grn-{len(db['goods_receipts']) + 1}",
         "grn_number": grn_num,
+        "company_name": company,
+        "created_by": email,
+        "is_sample": False,
         "receipt_date": grn.received_date or datetime.now().strftime("%Y-%m-%d"),
         "po_id": grn.po_id,
         "supplier_id": grn.supplier_id,
@@ -29,6 +41,8 @@ def create_goods_receipt(grn: GRNCreate):
     db["inventory_ledger"].append({
         "id": f"ledg-{len(db['inventory_ledger']) + 1}",
         "posting_date": datetime.now().strftime("%Y-%m-%d"),
+        "company_name": company,
+        "created_by": email,
         "item_id": "itm-01",
         "warehouse_id": grn.warehouse_id,
         "voucher_type": "GRN",
@@ -39,7 +53,8 @@ def create_goods_receipt(grn: GRNCreate):
         "valuation_rate": 72000
     })
 
-    save_db()
+    save_db("goods_receipts")
+    save_db("inventory_ledger")
     return {"success": True, "data": new_grn}
 
 @router.get("/goods-receipts/{grn_id}")
@@ -195,8 +210,8 @@ def create_stock_issue(payload: Dict[str, Any]):
         processed_items.append({
             "id": f"issi-{len(db.get('stock_issues', [])) + 1}-1",
             "item_id": itm_default.get("id", "itm-01"),
-            "item_code": itm_default.get("item_code", "IT-LAP-0001"),
-            "item_name": itm_default.get("item_name", "Dell Latitude 5440 Laptop"),
+            "item_code": itm_default.get("item_code", "ITM-001"),
+            "item_name": itm_default.get("item_name", "Item"),
             "requested_qty": 1,
             "approved_qty": 1,
             "issue_qty": 1,
@@ -485,8 +500,8 @@ def get_inventory_balances():
         itm = items_map.get(b.get("item_id"), {})
         wh = wh_map.get(b.get("warehouse_id"), {})
         
-        item_code = b.get("item_code") or itm.get("item_code") or "IT-LAP-0001"
-        item_name = b.get("item_name") or itm.get("item_name") or "Dell Latitude 5440 Laptop"
+        item_code = b.get("item_code") or itm.get("item_code") or "ITM-001"
+        item_name = b.get("item_name") or itm.get("item_name") or "Item"
         warehouse_name = b.get("warehouse_name") or wh.get("name") or "Central Goods Warehouse"
         category_name = b.get("category_name") or cat_map.get(itm.get("category_id")) or "IT Equipment"
         brand_name = b.get("brand_name") or brand_map.get(itm.get("brand_id")) or "Dell Technologies"
@@ -597,47 +612,13 @@ def get_item_serials():
 # PHYSICAL STOCK VERIFICATION (SECTION 26)
 # =========================================================================
 @router.get("/stock-counts")
-def get_stock_counts():
-    if "stock_count_sessions" not in db or not db["stock_count_sessions"]:
-        # Seed initial physical verification session matching PDF section 26
-        db["stock_count_sessions"] = [
-            {
-                "id": "cnt-1",
-                "count_session_number": "COUNT-2026-001",
-                "session_number": "COUNT-2026-001",
-                "count_date": datetime.now().strftime("%Y-%m-%d"),
-                "warehouse_id": "wh-01",
-                "warehouse_name": "Central Goods Warehouse",
-                "counter_name": "Michael Chang (Store Manager)",
-                "is_blind_count": True,
-                "status": "In Progress",
-                "created_at": datetime.now().isoformat(),
-                "entries": [
-                    {
-                        "item_id": "itm-01",
-                        "item_code": "IT-LAP-0001",
-                        "item_name": "Dell Latitude 5440 Laptop",
-                        "system_quantity": 10,
-                        "physical_quantity": 8,
-                        "variance_quantity": -2,
-                        "variance_value": -144000.0,
-                        "reason": "Physical count mismatch found during annual audit."
-                    },
-                    {
-                        "item_id": "itm-02",
-                        "item_code": "ELE-CBL-0002",
-                        "item_name": "Cat6 Ethernet Cable (305m Drum)",
-                        "system_quantity": 650,
-                        "physical_quantity": 650,
-                        "variance_quantity": 0,
-                        "variance_value": 0.0,
-                        "reason": "Physical count matched system stock."
-                    }
-                ]
-            }
-        ]
+def get_stock_counts(request: Request, x_company_name: str = Header(None)):
+    co = x_company_name or request.headers.get("x-company-name") or request.query_params.get("company_name")
+    if "stock_count_sessions" not in db:
+        db["stock_count_sessions"] = []
         save_db()
-    return {"success": True, "data": db["stock_count_sessions"]}
+    data = filter_by_company(db.get("stock_count_sessions", []), co)
+    return {"success": True, "data": data}
 
 @router.post("/stock-counts")
 def create_stock_count(payload: Dict[str, Any]):
@@ -739,46 +720,13 @@ def reconcile_stock_count(cnt_id: str):
 # =========================================================================
 @router.get("/reservations")
 @router.get("/stock-reservations")
-def get_reservations():
-    if "stock_reservations" not in db or not db["stock_reservations"]:
-        db["stock_reservations"] = [
-            {
-                "id": "res-1",
-                "transaction_type": "Indent Request",
-                "transaction_id": "IND-2026-000123",
-                "indent_id": "ind-1001",
-                "item_id": "itm-01",
-                "item_code": "IT-LAP-0001",
-                "item_name": "Dell Latitude 5440 Laptop",
-                "warehouse_id": "wh-01",
-                "warehouse_name": "Central Goods Warehouse",
-                "reserved_qty": 3,
-                "consumed_qty": 0,
-                "released_qty": 0,
-                "expiry_date": "2026-09-30",
-                "status": "Active",
-                "created_at": datetime.now().strftime("%Y-%m-%d")
-            },
-            {
-                "id": "res-2",
-                "transaction_type": "Sales Order",
-                "transaction_id": "SO-2026-00921",
-                "indent_id": "",
-                "item_id": "itm-02",
-                "item_code": "ELE-CBL-0002",
-                "item_name": "Cat6 Ethernet Cable (305m Drum)",
-                "warehouse_id": "wh-01",
-                "warehouse_name": "Central Goods Warehouse",
-                "reserved_qty": 50,
-                "consumed_qty": 0,
-                "released_qty": 0,
-                "expiry_date": "2026-10-15",
-                "status": "Active",
-                "created_at": datetime.now().strftime("%Y-%m-%d")
-            }
-        ]
+def get_reservations(request: Request, x_company_name: str = Header(None)):
+    co = x_company_name or request.headers.get("x-company-name") or request.query_params.get("company_name")
+    if "stock_reservations" not in db:
+        db["stock_reservations"] = []
         save_db()
-    return {"success": True, "data": db["stock_reservations"]}
+    data = filter_by_company(db.get("stock_reservations", []), co)
+    return {"success": True, "data": data}
 
 @router.post("/reservations")
 @router.post("/stock-reservations")
@@ -833,45 +781,9 @@ def release_reservation(payload: Dict[str, Any] = {}, res_id: Optional[str] = No
 # =========================================================================
 @router.get("/assets")
 def get_assets():
-    if "assets" not in db or not db["assets"]:
-        db["assets"] = [
-            {
-                "id": "ast-1",
-                "asset_number": "AST-2026-0001",
-                "item_id": "itm-01",
-                "item_code": "IT-LAP-0001",
-                "item_name": "Dell Latitude 5440 Laptop",
-                "serial_number": "DELL-LAT-9099",
-                "purchase_date": "2026-08-01",
-                "purchase_value": 72000,
-                "warranty_expiry": "2029-08-01",
-                "assigned_employee_id": "usr-05",
-                "assigned_employee_name": "David Miller (Developer)",
-                "assigned_location": "Building A, Floor 4, Desk 405",
-                "condition": "Good",
-                "status": "Assigned",
-                "last_service_date": "2026-08-10"
-            },
-            {
-                "id": "ast-2",
-                "asset_number": "AST-2026-0002",
-                "item_id": "itm-01",
-                "item_code": "IT-LAP-0001",
-                "item_name": "Dell Latitude 5440 Laptop",
-                "serial_number": "DELL-LAT-9100",
-                "purchase_date": "2026-08-01",
-                "purchase_value": 72000,
-                "warranty_expiry": "2029-08-01",
-                "assigned_employee_id": "usr-01",
-                "assigned_employee_name": "Sarah Jenkins",
-                "assigned_location": "Executive Wing, Desk 101",
-                "condition": "Good",
-                "status": "Assigned",
-                "last_service_date": "2026-08-12"
-            }
-        ]
-        save_db()
-    return {"success": True, "data": db["assets"]}
+    if "assets" not in db:
+        db["assets"] = []
+    return {"success": True, "data": db.get("assets", [])}
 
 @router.post("/assets")
 def create_asset(payload: Dict[str, Any]):

@@ -82,7 +82,7 @@ def get_openapi_schema_fallback():
 @app.get("/api/health")
 def healthcheck():
     from db.database import check_db_connection
-    db_status = "Connected (PostgreSQL)" if check_db_connection() else "Disconnected (Falling back to local JSON store)"
+    db_status = "Connected (PostgreSQL)" if check_db_connection() else "Disconnected (PostgreSQL Connection Failed)"
     return {
         "success": True,
         "status": "UP",

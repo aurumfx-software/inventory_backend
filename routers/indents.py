@@ -1,16 +1,23 @@
-from fastapi import APIRouter, HTTPException
-from db.database_store import db, save_db, get_next_doc_number
+from fastapi import APIRouter, HTTPException, Request, Header
+from db.database_store import db, save_db, get_next_doc_number, filter_by_company, filter_by_user_or_company
 from schemas.schemas import IndentCreate
 from datetime import datetime
 from typing import Dict, Any, Optional
 
 router = APIRouter(prefix="/api/indents", tags=["Indents"])
 
+def get_auth_context(request: Request, x_user_email: str = None, x_company_name: str = None, x_user_role: str = None):
+    email = x_user_email or request.headers.get("x-user-email") or request.query_params.get("user_email") or ""
+    company = x_company_name or request.headers.get("x-company-name") or request.query_params.get("company_name") or "Organization"
+    role = x_user_role or request.headers.get("x-user-role") or request.query_params.get("role_id") or ""
+    return email, company, role
+
 @router.get("")
-def get_indents():
-    # Enrich indents with department names and user names
+def get_indents(request: Request, x_user_email: str = Header(None), x_company_name: str = Header(None), x_user_role: str = Header(None)):
+    email, company, role = get_auth_context(request, x_user_email, x_company_name, x_user_role)
+    scoped = filter_by_user_or_company(db.get("indents", []), email, company, role)
     results = []
-    for indent in db.get("indents", []):
+    for indent in scoped:
         dept = next((d for d in db.get("departments", []) if d["id"] == indent.get("department_id")), {})
         usr = next((u for u in db.get("users", []) if u["id"] == indent.get("requested_by")), {})
         
@@ -27,7 +34,8 @@ def get_indents():
     return {"success": True, "data": results}
 
 @router.post("")
-def create_indent(payload: dict):
+def create_indent(payload: dict, request: Request, x_user_email: str = Header(None), x_company_name: str = Header(None)):
+    email, company, role = get_auth_context(request, x_user_email, x_company_name, None)
     # Validations per requirements:
     # 1. Purpose is mandatory
     purpose = payload.get("purpose", "").strip()
@@ -66,6 +74,9 @@ def create_indent(payload: dict):
         "id": new_id,
         "indent_number": indent_num,
         "request_date": datetime.now().strftime("%Y-%m-%d"),
+        "company_name": company,
+        "created_by": email,
+        "is_sample": False,
         "department_id": payload.get("department_id") or "dept-01",
         "requested_by": payload.get("requested_by") or "usr-05",
         "required_date": payload.get("required_date") or datetime.now().strftime("%Y-%m-%d"),
@@ -82,6 +93,7 @@ def create_indent(payload: dict):
     }
     
     db["indents"].append(new_indent)
+    save_db("indents")
 
     # Workflow request creation
     approval = {
