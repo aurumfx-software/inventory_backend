@@ -50,9 +50,6 @@ def get_report(report_type: str):
             })
 
     else:
-        data = [
-            {"ref_no": "REP-2026-001", "date": datetime.now().strftime("%Y-%m-%d"), "item": "Dell Latitude 5440 Laptop", "qty": 10, "value": 720000, "status": "Completed"},
-            {"ref_no": "REP-2026-002", "date": datetime.now().strftime("%Y-%m-%d"), "item": "Cat6 Ethernet Cable Drum", "qty": 50, "value": 2250, "status": "In Progress"}
-        ]
+        data = []
 
     return {"success": True, "data": data}
