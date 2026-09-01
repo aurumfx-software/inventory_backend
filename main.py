@@ -33,6 +33,11 @@ app = FastAPI(
     root_path=root_path
 )
 
+@app.on_event("startup")
+def startup_event():
+    print("[SERVER STARTUP] Automatically initializing PostgreSQL tables and sync state...")
+    load_db()
+
 
 cors_origins_raw = os.getenv("CORS_ORIGINS", "*")
 
