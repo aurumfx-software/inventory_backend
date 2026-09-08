@@ -107,7 +107,8 @@ def save_db(target_table: str = None):
                 if not isinstance(records, list):
                     continue
 
-                current_ids = set()
+                # Deduplicate records by ID to prevent PostgreSQL UniqueViolation batch errors
+                dedup_map = {}
                 for idx, item in enumerate(records):
                     if isinstance(item, dict):
                         item_id = str(item.get("id", f"{table_name}-{idx+1}"))
@@ -115,8 +116,10 @@ def save_db(target_table: str = None):
                     else:
                         item_id = str(item)
                         payload_val = {"id": str(item), "name": str(item)}
+                    dedup_map[item_id] = payload_val
 
-                    current_ids.add(item_id)
+                current_ids = set(dedup_map.keys())
+                for item_id, payload_val in dedup_map.items():
                     session.merge(model_cls(id=item_id, payload=payload_val))
 
                 # Clean up deleted records

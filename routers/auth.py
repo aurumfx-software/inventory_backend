@@ -2,7 +2,7 @@ import os
 import re
 import random
 from fastapi import APIRouter, HTTPException, Request, Header
-from db.database_store import db, save_db
+from db.database_store import db, save_db, load_db
 from schemas.schemas import LoginRequest, RegisterRequest, RoleSwitchRequest, SendOTPRequest, VerifyOTPRequest
 import jwt
 from datetime import datetime, timedelta
@@ -85,6 +85,26 @@ def login(req: LoginRequest):
         if len(phone_digits) >= 7 and u_phone_digits and phone_digits == u_phone_digits:
             user = u
             break
+
+    if not user:
+        try:
+            load_db()
+            for u in db.get("users", []):
+                u_email = (u.get("email") or "").strip().lower()
+                u_phone = (u.get("phone") or "").strip().lower()
+                u_phone_digits = re.sub(r"\D", "", u_phone)
+
+                if u_email and u_email == clean_identifier:
+                    user = u
+                    break
+                if u_phone and u_phone == clean_identifier:
+                    user = u
+                    break
+                if len(phone_digits) >= 7 and u_phone_digits and phone_digits == u_phone_digits:
+                    user = u
+                    break
+        except Exception:
+            pass
 
     if not user:
         for u in DEFAULT_SYSTEM_USERS:
