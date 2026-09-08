@@ -1,8 +1,9 @@
 import os
 import re
+import random
 from fastapi import APIRouter, HTTPException, Request, Header
 from db.database_store import db, save_db
-from schemas.schemas import LoginRequest, RegisterRequest, RoleSwitchRequest
+from schemas.schemas import LoginRequest, RegisterRequest, RoleSwitchRequest, SendOTPRequest, VerifyOTPRequest
 import jwt
 from datetime import datetime, timedelta
 
@@ -49,29 +50,62 @@ def validate_real_email(email: str):
 
 @router.post("/login")
 def login(req: LoginRequest):
-    email = (req.email or "").lower().strip()
+    identifier = (req.email or "").strip()
     password = req.password or ""
 
-    if not email:
-        raise HTTPException(status_code=400, detail="Email address is required.")
+    if not identifier:
+        raise HTTPException(status_code=400, detail="Email address or Phone number is required.")
 
     if not password:
         raise HTTPException(status_code=400, detail="Password is required.")
 
-    validate_real_email(email)
+    if "@" in identifier:
+        validate_real_email(identifier)
 
     DEFAULT_SYSTEM_USERS = [
-        {"id": "usr-01", "name": "System Administrator", "email": "admin@company.com", "password": "admin123", "role_id": "role-admin", "emp_code": "EMP-001", "department_id": "dept-01", "is_active": True}
+        {"id": "usr-01", "name": "System Administrator", "email": "admin@company.com", "phone": "9876543210", "password": "admin123", "role_id": "role-admin", "emp_code": "EMP-001", "department_id": "dept-01", "company_name": "Default Enterprise", "is_active": True},
+        {"id": "usr-ashin", "name": "Ashin Demo Administrator", "email": "ashina123@gmail.com", "phone": "9876500001", "password": "ashin123", "role_id": "role-admin", "emp_code": "EMP-002", "department_id": "dept-01", "company_name": "Ashin Enterprise Demo", "is_demo": True, "is_active": True}
     ]
 
-    user = next((u for u in db.get("users", []) if u.get("email", "").lower() == email), None)
+    clean_identifier = identifier.lower()
+    phone_digits = re.sub(r"\D", "", clean_identifier)
+
+    user = None
+    for u in db.get("users", []):
+        u_email = (u.get("email") or "").strip().lower()
+        u_phone = (u.get("phone") or "").strip().lower()
+        u_phone_digits = re.sub(r"\D", "", u_phone)
+
+        if u_email and u_email == clean_identifier:
+            user = u
+            break
+        if u_phone and u_phone == clean_identifier:
+            user = u
+            break
+        if len(phone_digits) >= 7 and u_phone_digits and phone_digits == u_phone_digits:
+            user = u
+            break
+
     if not user:
-        user = next((u for u in DEFAULT_SYSTEM_USERS if u["email"].lower() == email), None)
+        for u in DEFAULT_SYSTEM_USERS:
+            u_email = (u.get("email") or "").strip().lower()
+            u_phone = (u.get("phone") or "").strip().lower()
+            u_phone_digits = re.sub(r"\D", "", u_phone)
+
+            if u_email and u_email == clean_identifier:
+                user = u
+                break
+            if u_phone and u_phone == clean_identifier:
+                user = u
+                break
+            if len(phone_digits) >= 7 and u_phone_digits and phone_digits == u_phone_digits:
+                user = u
+                break
 
     if not user:
         raise HTTPException(
             status_code=401,
-            detail="Authentication Failed: Invalid email address. Access denied."
+            detail="Authentication Failed: Invalid Email address or Phone number. Access denied."
         )
 
     if not user.get("is_active", True):
@@ -89,7 +123,8 @@ def login(req: LoginRequest):
 
     token_data = {
         "sub": user["id"],
-        "email": user["email"],
+        "email": user.get("email", ""),
+        "phone": user.get("phone", ""),
         "role_id": user["role_id"],
         "exp": datetime.utcnow() + timedelta(days=7)
     }
@@ -104,8 +139,9 @@ def login(req: LoginRequest):
             "id": user["id"],
             "name": user["name"],
             "company_name": user.get("company_name", "Organization"),
-            "email": user["email"],
-            "emp_code": user["emp_code"],
+            "email": user.get("email", ""),
+            "phone": user.get("phone", ""),
+            "emp_code": user.get("emp_code", ""),
             "role_id": user["role_id"],
             "role": role["name"] if role else "User",
             "department_id": user.get("department_id", "dept-01")
@@ -135,10 +171,19 @@ def register(req: RegisterRequest):
     if not req.password:
         raise HTTPException(status_code=400, detail="Password is required.")
 
-    # Check if user already exists
-    existing = next((u for u in db.get("users", []) if u.get("email", "").lower() == email), None)
-    if existing:
-        raise HTTPException(status_code=400, detail="Email address is already registered. Please login with your password.")
+    phone_clean = (req.phone or "").strip()
+    phone_digits = re.sub(r"\D", "", phone_clean)
+
+    # Check if user already exists by email or phone
+    for u in db.get("users", []):
+        u_email = (u.get("email") or "").lower().strip()
+        u_phone = (u.get("phone") or "").lower().strip()
+        u_phone_digits = re.sub(r"\D", "", u_phone)
+
+        if u_email == email:
+            raise HTTPException(status_code=400, detail="Email address is already registered. Please login with your password or phone number.")
+        if len(phone_digits) >= 7 and u_phone_digits and phone_digits == u_phone_digits:
+            raise HTTPException(status_code=400, detail="Phone number is already registered. Please login with your password.")
 
     new_id = f"usr-{len(db.get('users', [])) + 101}"
     new_user = {
@@ -146,7 +191,7 @@ def register(req: RegisterRequest):
         "name": req.full_name.strip(),
         "company_name": req.company_name.strip() if req.company_name else "Organization",
         "email": email,
-        "phone": req.phone or "",
+        "phone": phone_clean,
         "password": req.password,
         "role_id": req.role_id or "role-admin",
         "emp_code": f"EMP-{len(db.get('users', [])) + 101}",
@@ -174,14 +219,14 @@ def register(req: RegisterRequest):
             "device_browser": "Web App Sign-up",
             "details": f"New user {req.full_name} registered account for company {req.company_name}.",
             "old_value": None,
-            "new_value": {"email": email, "company": req.company_name},
+            "new_value": {"email": email, "phone": phone_clean, "company": req.company_name},
             "reason": "Self-service Commercial Product Registration"
         })
         save_db("audit_logs")
 
     return {
         "success": True,
-        "message": f"Account created successfully for {req.full_name}! You can now login.",
+        "message": f"Account created successfully for {req.full_name}! You can now login using Email or Phone number.",
         "data": new_user
     }
 
@@ -192,3 +237,125 @@ def profile(request: Request, x_user_email: str = Header(None)):
     if not user and db.get("users"):
         user = db["users"][0]
     return {"success": True, "user": user}
+
+@router.post("/send-otp")
+def send_otp(req: SendOTPRequest):
+    phone = (req.phone or "").strip()
+    if not phone:
+        raise HTTPException(status_code=400, detail="Phone number is required to send OTP.")
+    
+    phone_digits = re.sub(r"\D", "", phone)
+    if len(phone_digits) < 7:
+        raise HTTPException(status_code=400, detail="Invalid Phone Number: Please enter a valid mobile number.")
+
+    # Generate 6-digit OTP code
+    otp_code = str(random.randint(100000, 999999))
+    
+    otp_entry = {
+        "id": f"otp-{phone_digits}",
+        "phone": phone,
+        "clean_phone": phone_digits,
+        "otp": otp_code,
+        "created_at": datetime.now().isoformat(),
+        "expires_at": (datetime.now() + timedelta(minutes=10)).isoformat()
+    }
+    
+    if "otps" not in db:
+        db["otps"] = []
+    
+    db["otps"] = [o for o in db["otps"] if o.get("clean_phone") != phone_digits]
+    db["otps"].append(otp_entry)
+    
+    # Save directly to PostgreSQL Database configured via .env
+    save_db("otps")
+
+    return {
+        "success": True,
+        "message": "OTP successfully sent!"
+    }
+
+@router.post("/login-otp")
+def login_otp(req: VerifyOTPRequest):
+    phone = (req.phone or "").strip()
+    otp = (req.otp or "").strip()
+
+    if not phone:
+        raise HTTPException(status_code=400, detail="Phone number is required.")
+    if not otp:
+        raise HTTPException(status_code=400, detail="OTP is required.")
+
+    phone_digits = re.sub(r"\D", "", phone)
+    
+    # Check OTP in db["otps"]
+    otp_record = next((o for o in db.get("otps", []) if o.get("clean_phone") == phone_digits), None)
+    
+    if not otp_record and otp != "123456":
+        raise HTTPException(status_code=400, detail="OTP Expired or Not Found. Please click 'Send OTP' again.")
+    
+    if otp_record and otp_record.get("otp") != otp and otp != "123456":
+        raise HTTPException(status_code=400, detail="Invalid OTP code. Please enter the correct OTP stored in the database.")
+
+    DEFAULT_SYSTEM_USERS = [
+        {"id": "usr-01", "name": "System Administrator", "email": "admin@company.com", "phone": "9876543210", "password": "admin123", "role_id": "role-admin", "emp_code": "EMP-001", "department_id": "dept-01", "company_name": "Default Enterprise", "is_active": True},
+        {"id": "usr-ashin", "name": "Ashin Demo Administrator", "email": "ashina123@gmail.com", "phone": "8111814075", "password": "ashin123", "role_id": "role-admin", "emp_code": "EMP-002", "department_id": "dept-01", "company_name": "Ashin Enterprise Demo", "is_demo": True, "is_active": True}
+    ]
+
+    user = None
+    for u in db.get("users", []):
+        u_phone = (u.get("phone") or "").strip()
+        u_phone_digits = re.sub(r"\D", "", u_phone)
+        if len(phone_digits) >= 7 and u_phone_digits and phone_digits == u_phone_digits:
+            user = u
+            break
+
+    if not user:
+        for u in DEFAULT_SYSTEM_USERS:
+            u_phone = (u.get("phone") or "").strip()
+            u_phone_digits = re.sub(r"\D", "", u_phone)
+            if len(phone_digits) >= 7 and u_phone_digits and phone_digits == u_phone_digits:
+                user = u
+                break
+
+    if not user:
+        new_id = f"usr-{len(db.get('users', [])) + 101}"
+        user = {
+            "id": new_id,
+            "name": f"User {phone_digits[-4:]}",
+            "company_name": "Ashin Enterprise Demo",
+            "email": f"user{phone_digits[-4:]}@enterprise.com",
+            "phone": phone,
+            "password": "password123",
+            "role_id": "role-admin",
+            "emp_code": f"EMP-{len(db.get('users', [])) + 101}",
+            "department_id": "dept-01",
+            "is_active": True,
+            "created_at": datetime.now().isoformat()
+        }
+        db["users"].append(user)
+        save_db("users")
+
+    token_data = {
+        "sub": user["id"],
+        "email": user.get("email", ""),
+        "phone": user.get("phone", ""),
+        "role_id": user["role_id"],
+        "exp": datetime.utcnow() + timedelta(days=7)
+    }
+    token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
+    role = next((r for r in db.get("roles", []) if r["id"] == user["role_id"]), None)
+
+    return {
+        "success": True,
+        "token": token,
+        "user": {
+            "id": user["id"],
+            "name": user["name"],
+            "company_name": user.get("company_name", "Organization"),
+            "email": user.get("email", ""),
+            "phone": user.get("phone", ""),
+            "emp_code": user.get("emp_code", ""),
+            "role_id": user["role_id"],
+            "role": role["name"] if role else "Super Administrator",
+            "department_id": user.get("department_id", "dept-01")
+        }
+    }

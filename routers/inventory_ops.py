@@ -16,6 +16,7 @@ def get_auth_context(request: Request, x_user_email: str = None, x_company_name:
 def get_goods_receipts(request: Request, x_user_email: str = Header(None), x_company_name: str = Header(None), x_user_role: str = Header(None)):
     email, company, role = get_auth_context(request, x_user_email, x_company_name, x_user_role)
     data = filter_by_user_or_company(db.get("goods_receipts", []), email, company, role)
+    data.sort(key=lambda x: str(x.get("created_at") or x.get("receipt_date") or x.get("grn_number") or x.get("id")), reverse=True)
     return {"success": True, "data": data}
 
 @router.post("/goods-receipts")
@@ -36,9 +37,9 @@ def create_goods_receipt(grn: GRNCreate, request: Request, x_user_email: str = H
         "status": "Posted",
         "created_at": datetime.now().isoformat()
     }
-    db["goods_receipts"].append(new_grn)
+    db["goods_receipts"].insert(0, new_grn)
     
-    db["inventory_ledger"].append({
+    db["inventory_ledger"].insert(0, {
         "id": f"ledg-{len(db['inventory_ledger']) + 1}",
         "posting_date": datetime.now().strftime("%Y-%m-%d"),
         "company_name": company,
@@ -53,47 +54,52 @@ def create_goods_receipt(grn: GRNCreate, request: Request, x_user_email: str = H
         "valuation_rate": 72000
     })
 
-    save_db("goods_receipts")
-    save_db("inventory_ledger")
+    save_db()
     return {"success": True, "data": new_grn}
 
 @router.get("/goods-receipts/{grn_id}")
-def get_goods_receipt(grn_id: str):
-    grn = next((g for g in db["goods_receipts"] if g["id"] == grn_id or g.get("grn_number") == grn_id), None)
-    if grn:
-        return {"success": True, "data": grn}
-    return {"success": False, "message": "GRN not found"}
+def get_goods_receipt_detail(grn_id: str):
+    grn = next((g for g in db.get("goods_receipts", []) if g["id"] == grn_id or g.get("grn_number") == grn_id), None)
+    if not grn:
+        return {"success": False, "message": "GRN not found"}
+    return {"success": True, "data": grn}
 
 @router.post("/goods-receipts/{grn_id}/inspect")
-def inspect_grn(grn_id: str, payload: Dict[str, Any]):
-    for g in db["goods_receipts"]:
-        if g["id"] == grn_id:
-            g["inspection_status"] = payload.get("status", "Passed")
+def update_grn_inspection_status(grn_id: str, payload: Dict[str, Any]):
+    for g in db.get("goods_receipts", []):
+        if g["id"] == grn_id or g.get("grn_number") == grn_id:
+            g["inspection_status"] = payload.get("status", "Inspected & Passed")
+            if payload.get("remarks"):
+                g["inspection_remarks"] = payload.get("remarks")
             save_db()
             return {"success": True, "data": g}
     return {"success": False, "message": "GRN not found"}
 
 @router.post("/goods-receipts/{grn_id}/post")
-def post_grn(grn_id: str):
-    for g in db["goods_receipts"]:
-        if g["id"] == grn_id:
+def post_grn_to_ledger(grn_id: str):
+    for g in db.get("goods_receipts", []):
+        if g["id"] == grn_id or g.get("grn_number") == grn_id:
             g["status"] = "Posted"
+            g["posted_at"] = datetime.now().isoformat()
             save_db()
             return {"success": True, "data": g}
     return {"success": False, "message": "GRN not found"}
 
 @router.post("/goods-receipts/{grn_id}/cancel")
-def cancel_grn(grn_id: str):
-    for g in db["goods_receipts"]:
-        if g["id"] == grn_id:
+def cancel_grn(grn_id: str, payload: Dict[str, Any]):
+    for g in db.get("goods_receipts", []):
+        if g["id"] == grn_id or g.get("grn_number") == grn_id:
             g["status"] = "Cancelled"
+            g["cancel_reason"] = payload.get("reason", "Cancelled by user")
             save_db()
             return {"success": True, "data": g}
     return {"success": False, "message": "GRN not found"}
 
 @router.get("/quality-inspections")
 def get_quality_inspections():
-    return {"success": True, "data": db.get("quality_inspections", [])}
+    data = db.get("quality_inspections", [])
+    data.sort(key=lambda x: str(x.get("created_at") or x.get("inspection_date") or x.get("id")), reverse=True)
+    return {"success": True, "data": data}
 
 @router.post("/quality-inspections")
 def create_quality_inspection(payload: Dict[str, Any]):
@@ -123,7 +129,7 @@ def create_quality_inspection(payload: Dict[str, Any]):
         "inspection_rows": payload.get("inspection_rows", []),
         "created_at": datetime.now().isoformat()
     }
-    db["quality_inspections"].append(new_qi)
+    db["quality_inspections"].insert(0, new_qi)
     save_db()
     return {"success": True, "data": new_qi, "message": f"Quality inspection {ref} created."}
 

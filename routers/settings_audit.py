@@ -40,14 +40,25 @@ def create_audit_log(payload: Dict[str, Any]):
 
 @router.get("/notifications")
 def get_notifications():
-    return {"success": True, "data": db["notifications"]}
+    notifs = list(db.get("notifications", []))
+    notifs.sort(key=lambda n: str(n.get("created_at") or n.get("time") or n.get("id")), reverse=True)
+    return {"success": True, "data": notifs}
+
+@router.post("/notifications/read-all")
+def mark_all_notifications_read():
+    for n in db.get("notifications", []):
+        n["is_read"] = True
+        n["unread"] = False
+    save_db("notifications")
+    return {"success": True, "message": "All notifications marked as read."}
 
 @router.post("/notifications/{notif_id}/read")
 def mark_notification_read(notif_id: str):
-    for n in db["notifications"]:
-        if n.get("id") == notif_id:
+    for n in db.get("notifications", []):
+        if str(n.get("id")) == str(notif_id):
             n["is_read"] = True
-            save_db()
+            n["unread"] = False
+            save_db("notifications")
             return {"success": True, "data": n}
     return {"success": True, "message": "Notification marked read"}
 

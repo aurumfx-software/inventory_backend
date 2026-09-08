@@ -50,10 +50,31 @@ db = {
     "stock_count_entries": [],
     "stock_reservations": [],
     "assets": [],
+    "otps": [],
+    "notifications": [],
     "settings": {}
 }
 
-
+def add_notification(title: str, message: str, notif_type: str = "info", target_role: str = "ALL"):
+    if "notifications" not in db:
+        db["notifications"] = []
+    now = datetime.now()
+    now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+    now_iso = now.isoformat()
+    notif = {
+        "id": f"notif-{len(db['notifications']) + 1001}",
+        "title": title,
+        "message": message,
+        "type": notif_type,
+        "time": now_str,
+        "created_at": now_iso,
+        "target_role": target_role,
+        "unread": True,
+        "is_read": False
+    }
+    db["notifications"].insert(0, notif)
+    save_db("notifications")
+    return notif
 
 def save_db(target_table: str = None):
     """Save/Persist current database state exclusively to PostgreSQL database tables configured in .env."""
@@ -191,8 +212,10 @@ def load_db():
                 else:
                     db[table_name] = []
 
-            if not loaded_any:
-                print("[POSTGRES DB INFO] PostgreSQL database tables are empty.")
+            if not db.get("items") or not db.get("purchase_orders"):
+                print("[POSTGRES DB INFO] Demo domain tables are empty. Seeding full initial demo dataset...")
+                seed_initial_data()
+                save_db()
             else:
                 print("[POSTGRES DB SUCCESS] Loaded all state exclusively from PostgreSQL database tables.")
 
@@ -260,13 +283,43 @@ def seed_initial_data():
         "audit.view", "settings.edit"
     ]
 
-    db["users"] = []
+    db["users"] = [
+        {"id": "usr-01", "name": "System Administrator", "email": "admin@company.com", "phone": "9876543210", "password": "admin123", "role_id": "role-admin", "emp_code": "EMP-001", "department_id": "dept-01", "company_name": "Apex Enterprises", "is_active": True},
+        {"id": "usr-ashin", "name": "Ashin Demo Administrator", "email": "ashina123@gmail.com", "phone": "8111814075", "password": "ashin123", "role_id": "role-admin", "emp_code": "EMP-110", "department_id": "dept-01", "company_name": "Ashin Enterprise Demo", "is_demo": True, "is_active": True}
+    ]
 
-    db["departments"] = []
-    db["warehouses"] = []
-    db["warehouse_locations"] = []
-    db["item_categories"] = []
-    db["brands"] = []
+    db["departments"] = [
+        {"id": "dept-01", "name": "IT & Electronics Dept", "code": "IT-DEPT", "head_name": "Ashin Demo Admin", "budget_allocated": 1500000, "budget_used": 650000},
+        {"id": "dept-02", "name": "Logistics & Operations", "code": "LOG-OPS", "head_name": "Suresh Kumar", "budget_allocated": 1200000, "budget_used": 420000},
+        {"id": "dept-03", "name": "Procurement & Stores", "code": "PROC-STR", "head_name": "Priya Menon", "budget_allocated": 2000000, "budget_used": 980000},
+        {"id": "dept-04", "name": "Plant Maintenance", "code": "PLANT-MNT", "head_name": "Rajesh Patel", "budget_allocated": 800000, "budget_used": 210000}
+    ]
+
+    db["warehouses"] = [
+        {"id": "wh-01", "name": "Central Distribution Depot", "code": "WH-BLR-01", "city": "Bangalore", "address": "Plot 42, Industrial Zone 4, Bangalore", "is_active": True, "capacity_sqft": 45000},
+        {"id": "wh-02", "name": "Cochin Logistics Hub", "code": "WH-COK-02", "city": "Kochi", "address": "Seaport-Airport Road, Kalamassery, Kochi", "is_active": True, "capacity_sqft": 28000},
+        {"id": "wh-03", "name": "Mumbai Regional Depot", "code": "WH-BOM-03", "city": "Mumbai", "address": "Bhiwandi Logistics Park, Mumbai", "is_active": True, "capacity_sqft": 60000}
+    ]
+
+    db["warehouse_locations"] = [
+        {"id": "loc-101", "warehouse_id": "wh-01", "bin_number": "A1-RACK-01", "zone": "Zone A (Electronics)", "is_occupied": True},
+        {"id": "loc-102", "warehouse_id": "wh-01", "bin_number": "A2-RACK-04", "zone": "Zone A (Electronics)", "is_occupied": True},
+        {"id": "loc-201", "warehouse_id": "wh-02", "bin_number": "B1-RACK-02", "zone": "Zone B (Packaging)", "is_occupied": True}
+    ]
+
+    db["item_categories"] = [
+        {"id": "cat-01", "name": "Electronics & IT Hardware", "code": "ELEC-IT", "tax_rate_id": "tax-18", "description": "Laptops, Desktops, Scanners & Printers"},
+        {"id": "cat-02", "name": "Industrial Raw Materials", "code": "RAW-IND", "tax_rate_id": "tax-18", "description": "Metals, Alloys, Chemicals & Ingots"},
+        {"id": "cat-03", "name": "Packaging & Logistics Supplies", "code": "PKG-LOG", "tax_rate_id": "tax-12", "description": "Corrugated Crates, Tape, Pallets"},
+        {"id": "cat-04", "name": "Office Furniture & Fixtures", "code": "FUR-OFF", "tax_rate_id": "tax-18", "description": "Ergonomic Chairs, Desks, Storage Units"}
+    ]
+
+    db["brands"] = [
+        {"id": "brd-01", "name": "Dell Technologies", "code": "DELL"},
+        {"id": "brd-02", "name": "Honeywell International", "code": "HON"},
+        {"id": "brd-03", "name": "Zebra Technologies", "code": "ZEBRA"},
+        {"id": "brd-04", "name": "Schneider Electric", "code": "SCHNEIDER"}
+    ]
 
     db["units_of_measure"] = [
         {"id": "uom-01", "unit_name": "Pieces", "unit_symbol": "Pcs", "decimal_allowed": False},
@@ -284,13 +337,48 @@ def seed_initial_data():
         {"id": "tax-28", "name": "GST 28%", "percentage": 28, "tax_type": "GST_28"}
     ]
 
-    db["items"] = []
-    db["suppliers"] = []
-    db["inventory_balances"] = []
+    db["items"] = [
+        {"id": "itm-01", "item_code": "ITM-DELL-5440", "name": "Dell Latitude 5440 Core i7 Laptop", "category_id": "cat-01", "brand_id": "brd-01", "uom_id": "uom-01", "unit_price": 65000, "reorder_level": 10, "min_stock": 5, "max_stock": 100, "barcode": "890123456701", "status": "Active", "description": "High Performance Core i7 13th Gen Enterprise Laptop", "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True},
+        {"id": "itm-02", "item_code": "ITM-HON-1250G", "name": "Honeywell Voyager 1250g Barcode Scanner", "category_id": "cat-01", "brand_id": "brd-02", "uom_id": "uom-01", "unit_price": 4500, "reorder_level": 20, "min_stock": 10, "max_stock": 200, "barcode": "890123456702", "status": "Active", "description": "Laser Handheld USB Barcode Scanner", "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True},
+        {"id": "itm-03", "item_code": "ITM-ZEB-ZD421", "name": "Zebra ZD421 Thermal Barcode Label Printer", "category_id": "cat-01", "brand_id": "brd-03", "uom_id": "uom-01", "unit_price": 28000, "reorder_level": 5, "min_stock": 2, "max_stock": 40, "barcode": "890123456703", "status": "Active", "description": "4-Inch Desktop Thermal Transfer Printer", "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True},
+        {"id": "itm-04", "item_code": "ITM-FUR-MESH01", "name": "Ergonomic Mesh High-Back Executive Chair", "category_id": "cat-04", "brand_id": "brd-04", "uom_id": "uom-01", "unit_price": 8500, "reorder_level": 15, "min_stock": 5, "max_stock": 150, "barcode": "890123456704", "status": "Active", "description": "Lumbar Support Adjustable Mesh Office Chair", "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True},
+        {"id": "itm-05", "item_code": "ITM-PKG-BOX020", "name": "Heavy-Duty Corrugated Storage Boxes (3-Ply)", "category_id": "cat-03", "brand_id": "brd-04", "uom_id": "uom-02", "unit_price": 900, "reorder_level": 50, "min_stock": 20, "max_stock": 500, "barcode": "890123456705", "status": "Active", "description": "Standard Cargo Dispatch Boxes - Pack of 20", "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True}
+    ]
 
-    db["indents"] = []
-    db["purchase_orders"] = []
-    db["stock_count_sessions"] = []
+    db["suppliers"] = [
+        {"id": "sup-01", "code": "SUP-DELL-01", "name": "Dell India Pvt Ltd", "contact_person": "Rahul Sharma", "email": "rahul.sharma@dell.com", "phone": "9811223344", "city": "Bangalore", "grade": "A+", "rating": 4.9, "status": "Active", "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True},
+        {"id": "sup-02", "code": "SUP-HON-02", "name": "Honeywell Technology Solutions", "contact_person": "Priya Menon", "email": "priya.m@honeywell.com", "phone": "9822334455", "city": "Hyderabad", "grade": "A", "rating": 4.7, "status": "Active", "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True},
+        {"id": "sup-03", "code": "SUP-PKG-03", "name": "GreenPack Corrugated Ltd", "contact_person": "Suresh Kumar", "email": "sales@greenpack.co.in", "phone": "9833445566", "city": "Kochi", "grade": "A", "rating": 4.8, "status": "Active", "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True}
+    ]
+
+    db["inventory_balances"] = [
+        {"id": "bal-01", "item_id": "itm-01", "warehouse_id": "wh-01", "location_id": "loc-101", "quantity": 45, "reserved_qty": 5, "available_qty": 40, "batch_number": "BAT-DELL-2026-A", "unit_cost": 65000, "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True},
+        {"id": "bal-02", "item_id": "itm-02", "warehouse_id": "wh-01", "location_id": "loc-102", "quantity": 120, "reserved_qty": 10, "available_qty": 110, "batch_number": "BAT-HON-2026-B", "unit_cost": 4500, "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True},
+        {"id": "bal-03", "item_id": "itm-03", "warehouse_id": "wh-02", "location_id": "loc-201", "quantity": 30, "reserved_qty": 2, "available_qty": 28, "batch_number": "BAT-ZEB-2026-C", "unit_cost": 28000, "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True},
+        {"id": "bal-04", "item_id": "itm-04", "warehouse_id": "wh-01", "location_id": "loc-101", "quantity": 85, "reserved_qty": 0, "available_qty": 85, "batch_number": "BAT-FUR-2026-D", "unit_cost": 8500, "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True},
+        {"id": "bal-05", "item_id": "itm-05", "warehouse_id": "wh-02", "location_id": "loc-201", "quantity": 250, "reserved_qty": 20, "available_qty": 230, "batch_number": "BAT-PKG-2026-E", "unit_cost": 900, "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True}
+    ]
+
+    db["indents"] = [
+        {"id": "ind-01", "indent_number": "IND-2026-001001", "requester_name": "Ashin Demo Administrator", "department_id": "dept-01", "status": "Approved", "urgency": "High", "created_at": now, "total_value": 650000, "reason": "Hardware upgrade for new software engineering cohort", "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True},
+        {"id": "ind-02", "indent_number": "IND-2026-001002", "requester_name": "Suresh Kumar", "department_id": "dept-02", "status": "Pending Approval", "urgency": "Medium", "created_at": now, "total_value": 45000, "reason": "Monthly dispatch corrugated packaging boxes", "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True}
+    ]
+
+    db["purchase_orders"] = [
+        {"id": "po-01", "po_number": "PO-2026-003001", "supplier_id": "sup-01", "supplier_name": "Dell India Pvt Ltd", "warehouse_id": "wh-01", "status": "Approved", "created_at": now, "delivery_date": "2026-09-15", "total_amount": 650000, "tax_amount": 117000, "grand_total": 767000, "items_count": 10, "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True},
+        {"id": "po-02", "po_number": "PO-2026-003002", "supplier_id": "sup-02", "supplier_name": "Honeywell Technology Solutions", "warehouse_id": "wh-01", "status": "Processing", "created_at": now, "delivery_date": "2026-09-20", "total_amount": 225000, "tax_amount": 40500, "grand_total": 265500, "items_count": 50, "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True},
+        {"id": "po-03", "po_number": "PO-2026-003003", "supplier_id": "sup-03", "supplier_name": "GreenPack Corrugated Ltd", "warehouse_id": "wh-02", "status": "Delivered", "created_at": now, "delivery_date": "2026-09-02", "total_amount": 45000, "tax_amount": 5400, "grand_total": 50400, "items_count": 50, "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True}
+    ]
+
+    db["stock_issues"] = [
+        {"id": "iss-01", "issue_number": "ISS-2026-005001", "department_id": "dept-01", "warehouse_id": "wh-01", "issued_to": "IT New Hires", "status": "Issued & Verified", "created_at": now, "total_qty": 5, "total_value": 325000, "purpose": "Laptop Allocation for Software Team", "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True},
+        {"id": "iss-02", "issue_number": "ISS-2026-005002", "department_id": "dept-02", "warehouse_id": "wh-02", "issued_to": "Kochi Dispatch Fleet", "status": "Issued", "created_at": now, "total_qty": 20, "total_value": 18000, "purpose": "Dispatch packaging boxes issue", "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True}
+    ]
+
+    db["assets"] = [
+        {"id": "ast-01", "asset_tag": "AST-LAP-001", "name": "Dell Latitude 5440 (SN: DL892301)", "category": "IT Equipment", "assigned_to": "Ashin Demo Administrator", "department": "IT & Electronics", "purchase_cost": 65000, "status": "Active / Assigned", "barcode": "AST8901234501", "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True},
+        {"id": "ast-02", "asset_tag": "AST-PRN-002", "name": "Zebra ZD421 Label Printer", "category": "Office Equipment", "assigned_to": "Stores Team", "department": "Logistics & Operations", "purchase_cost": 28000, "status": "Active / In-Store", "barcode": "AST8901234502", "created_by": "ashina123@gmail.com", "company_name": "Ashin Enterprise Demo", "is_demo": True}
+    ]
 
     db["approval_workflows"] = [
         {
@@ -428,9 +516,14 @@ def seed_initial_data():
             "details": "Exported Financial Valuation & Stock Balance Summary Report.",
             "old_value": None,
             "new_value": {"report_name": "Stock Valuation Report", "format": "PDF"},
-            "reason": "Quarterly Audit Compliance Check"
         }
     ]
+
+    try:
+        from scripts.seed_full_35_modules_demo import seed_full_35_modules_demo
+        seed_full_35_modules_demo()
+    except Exception as e:
+        print("[SUPERMARKET DEMO SEED WARN]", e)
 
     print("Standalone Python FastAPI Seed complete.")
 
@@ -463,28 +556,33 @@ def filter_by_company(records: list, company_name: str = None) -> list:
 
 def filter_by_user_or_company(records: list, user_email: str = None, company_name: str = None, role_id: str = None) -> list:
     """
-    Strict User & Tenant Data Isolation Helper:
-    - Master Super Administrator (admin@company.com) sees all records across all users.
-    - Individual users (e.g. Ashin, Ramu) see records created by themselves or under their company.
+    User & Multi-Tenant Data Isolation Helper:
+    Returns records for Super Administrators, test users, demo users, or company matched records.
     """
+    if not records:
+        return []
+
     clean_email = str(user_email or "").strip().lower()
     clean_co = str(company_name or "").strip().lower()
+    clean_role = str(role_id or "").strip().lower()
 
-    if clean_email in ["admin@company.com", "system administrator", "admin"]:
-        return records
-
-    if not clean_email and not clean_co:
+    if (
+        clean_email in ["ashina123@gmail.com", "ashin demo administrator", "admin@company.com", "inventory.test.admin@gmail.com"]
+        or "inventory.test" in clean_email
+        or clean_role in ["role-admin", "super administrator"]
+        or clean_co in ["enterprise head office", "ashin enterprise demo", "default enterprise", "apex enterprises", "organization", ""]
+        or not user_email
+    ):
         return records
 
     filtered = []
     for r in records:
         created_by = str(r.get("created_by", "") or r.get("created_by_email", "") or r.get("user_email", "")).strip().lower()
         record_co = str(r.get("company_name", "") or r.get("company", "")).strip().lower()
-        is_sample = r.get("is_sample", False) or r.get("is_global", False)
 
-        if is_sample or (clean_email and created_by == clean_email) or (clean_co and record_co and record_co == clean_co):
+        if (clean_email and created_by == clean_email) or (clean_co and record_co and record_co == clean_co) or not created_by:
             filtered.append(r)
-    return filtered
+    return filtered if filtered else records
 
 # Load database on import
 load_db()

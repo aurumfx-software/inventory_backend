@@ -5,6 +5,13 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class SendOTPRequest(BaseModel):
+    phone: str
+
+class VerifyOTPRequest(BaseModel):
+    phone: str
+    otp: str
+
 class RegisterRequest(BaseModel):
     full_name: str
     company_name: Optional[str] = ""

@@ -68,6 +68,103 @@ app.include_router(reports_router)
 app.include_router(settings_audit_router)
 app.include_router(dashboard_router)
 
+# Shorthand Top-Level API Endpoints for Direct Data Access
+@app.get("/api/seed-demo")
+def trigger_seed_demo():
+    from db.database_store import seed_initial_data, save_db, load_db
+    seed_initial_data()
+    save_db()
+    load_db()
+    return {"success": True, "message": "Demo dataset populated and loaded into memory successfully!"}
+
+@app.get("/api/items")
+def get_shorthand_items():
+    from db.database_store import db, seed_initial_data, save_db, load_db
+    items = db.get("items", [])
+    if not items:
+        seed_initial_data()
+        save_db()
+        load_db()
+        items = db.get("items", [])
+    return {"success": True, "data": items, "count": len(items)}
+
+@app.get("/api/indents")
+def get_shorthand_indents():
+    from db.database_store import db, seed_initial_data, save_db, load_db
+    indents = db.get("indents", [])
+    if not indents:
+        seed_initial_data()
+        save_db()
+        load_db()
+        indents = db.get("indents", [])
+    return {"success": True, "data": indents, "count": len(indents)}
+
+@app.get("/api/purchase-orders")
+def get_shorthand_pos():
+    from db.database_store import db, seed_initial_data, save_db, load_db
+    pos = db.get("purchase_orders", [])
+    if not pos:
+        seed_initial_data()
+        save_db()
+        load_db()
+        pos = db.get("purchase_orders", [])
+    return {"success": True, "data": pos, "count": len(pos)}
+
+@app.get("/api/goods-receipts")
+def get_shorthand_grns():
+    from db.database_store import db, seed_initial_data, save_db, load_db
+    grns = db.get("goods_receipts", [])
+    if not grns:
+        seed_initial_data()
+        save_db()
+        load_db()
+        grns = db.get("goods_receipts", [])
+    return {"success": True, "data": grns, "count": len(grns)}
+
+@app.get("/api/suppliers")
+def get_shorthand_suppliers():
+    from db.database_store import db, seed_initial_data, save_db, load_db
+    suppliers = db.get("suppliers", [])
+    if not suppliers:
+        seed_initial_data()
+        save_db()
+        load_db()
+        suppliers = db.get("suppliers", [])
+    return {"success": True, "data": suppliers, "count": len(suppliers)}
+
+@app.get("/api/warehouses")
+def get_shorthand_warehouses():
+    from db.database_store import db, seed_initial_data, save_db, load_db
+    warehouses = db.get("warehouses", [])
+    if not warehouses:
+        seed_initial_data()
+        save_db()
+        load_db()
+        warehouses = db.get("warehouses", [])
+    return {"success": True, "data": warehouses, "count": len(warehouses)}
+
+@app.get("/api/stock-issues")
+def get_shorthand_stock_issues():
+    from db.database_store import db, seed_initial_data, save_db, load_db
+    issues = db.get("stock_issues", [])
+    if not issues:
+        seed_initial_data()
+        save_db()
+        load_db()
+        issues = db.get("stock_issues", [])
+    return {"success": True, "data": issues, "count": len(issues)}
+
+@app.get("/api/inventory-balances")
+def get_shorthand_balances():
+    from db.database_store import db, seed_initial_data, save_db, load_db
+    balances = db.get("inventory_balances", [])
+    if not balances:
+        seed_initial_data()
+        save_db()
+        load_db()
+        balances = db.get("inventory_balances", [])
+    return {"success": True, "data": balances, "count": len(balances)}
+
 # Root Endpoint
 @app.get("/")
 def root():

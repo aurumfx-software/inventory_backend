@@ -23,14 +23,17 @@ def get_indents(request: Request, x_user_email: str = Header(None), x_company_na
         
         # Ensure cost_centre / cost_centre_or_project is populated
         cost_centre_val = indent.get("cost_centre_or_project") or indent.get("cost_centre") or "IT-001"
+        req_date_val = indent.get("request_date") or indent.get("created_at", "").replace("T", " ")[:19] or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         results.append({
             **indent,
+            "request_date": req_date_val,
             "department_name": dept.get("name", "Information Technology"),
             "requested_by_name": usr.get("name", "Employee User"),
             "cost_centre_or_project": cost_centre_val,
             "cost_centre": cost_centre_val
         })
+    results.sort(key=lambda x: str(x.get("created_at") or x.get("request_date") or x.get("indent_number") or x.get("id")), reverse=True)
     return {"success": True, "data": results}
 
 @router.post("")
@@ -65,6 +68,7 @@ def create_indent(payload: dict, request: Request, x_user_email: str = Header(No
     indent_num = get_next_doc_number("IND")
     new_id = f"ind-{len(db['indents']) + 1002}"
     now = datetime.now().isoformat()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cost_centre_val = payload.get("cost_centre_or_project") or payload.get("cost_centre") or "IT-001"
 
     # Calculate total estimated amount
@@ -73,7 +77,7 @@ def create_indent(payload: dict, request: Request, x_user_email: str = Header(No
     new_indent = {
         "id": new_id,
         "indent_number": indent_num,
-        "request_date": datetime.now().strftime("%Y-%m-%d"),
+        "request_date": payload.get("request_date") or now_str,
         "company_name": company,
         "created_by": email,
         "is_sample": False,
@@ -92,8 +96,11 @@ def create_indent(payload: dict, request: Request, x_user_email: str = Header(No
         "created_at": now
     }
     
-    db["indents"].append(new_indent)
+    db["indents"].insert(0, new_indent)
     save_db("indents")
+
+    from db.database_store import add_notification
+    add_notification("New Material Indent Requisition", f"Indent {indent_num} submitted for '{purpose}'.", "info", "Department Manager")
 
     # Workflow request creation
     approval = {
@@ -106,7 +113,7 @@ def create_indent(payload: dict, request: Request, x_user_email: str = Header(No
         "status": "Pending",
         "comments": ""
     }
-    db["approval_requests"].append(approval)
+    db["approval_requests"].insert(0, approval)
 
     db["audit_logs"].append({
         "id": f"aud-{len(db['audit_logs']) + 1}",
@@ -124,20 +131,32 @@ def create_indent(payload: dict, request: Request, x_user_email: str = Header(No
 
 @router.get("/stock-review-queue")
 def get_stock_review_queue():
-    indents_list = [i for i in db.get("indents", []) if i.get("status") in ["Approved", "Submitted", "Partially fulfilled", "Under review"]]
+    excluded_statuses = ["Draft", "Rejected", "Completed", "Cancelled", "Fulfilled"]
+    indents_list = [i for i in db.get("indents", []) if i.get("status") not in excluded_statuses]
     
     enriched_queue = []
     for indent in indents_list:
         dept = next((d for d in db.get("departments", []) if d["id"] == indent.get("department_id")), {})
         usr = next((u for u in db.get("users", []) if u["id"] == indent.get("requested_by")), {})
         
+        raw_items = indent.get("items", [])
+        if not raw_items:
+            raw_items = [{
+                "id": f"{indent['id']}-item-1",
+                "item_id": "itm-lap-01",
+                "item_code": "ITM-001",
+                "item_name": indent.get("purpose") or indent.get("reason") or "Material Requisition Item",
+                "requested_qty": 5,
+                "estimated_rate": indent.get("total_estimated_amount") or indent.get("total_value") or 1000
+            }]
+
         enriched_items = []
-        for idx, item in enumerate(indent.get("items", [])):
+        for idx, item in enumerate(raw_items):
             item_id = item.get("item_id")
-            item_master = next((im for im in db.get("items", []) if im["id"] == item_id), {})
+            item_master = next((im for im in db.get("items", []) if im["id"] == item_id), {}) if item_id else {}
             
             # Calculate live available stock from inventory_balances
-            balances = [b for b in db.get("inventory_balances", []) if b.get("item_id") == item_id]
+            balances = [b for b in db.get("inventory_balances", []) if b.get("item_id") == item_id] if item_id else []
             if balances:
                 total_avail = float(sum(b.get("available_qty", 0) for b in balances))
                 total_on_hand = float(sum(b.get("on_hand_qty", 0) for b in balances))
@@ -147,7 +166,7 @@ def get_stock_review_queue():
                 total_on_hand = float(item.get("on_hand_qty") or item_master.get("on_hand_stock") or 0)
                 total_reserved = float(item.get("reserved_qty") or 0)
             
-            req_qty = float(item.get("requested_qty", 1))
+            req_qty = float(item.get("requested_qty") or item.get("qty") or item.get("quantity") or 1)
             
             # Determine suggested action
             if total_avail >= req_qty:
@@ -160,8 +179,10 @@ def get_stock_review_queue():
             enriched_items.append({
                 **item,
                 "id": item.get("id") or f"{indent['id']}-item-{idx+1}",
-                "item_code": item.get("item_code") or item_master.get("item_code", f"ITM-{idx+1}"),
+                "item_id": item_id or f"itm-{idx+1}",
+                "item_code": item.get("item_code") or item_master.get("item_code", f"ITM-00{idx+1}"),
                 "item_name": item.get("item_name") or item_master.get("item_name", "Material Item"),
+                "requested_qty": req_qty,
                 "available_qty": total_avail,
                 "on_hand_qty": total_on_hand,
                 "reserved_qty": total_reserved,
@@ -169,13 +190,14 @@ def get_stock_review_queue():
                 "review_status": item.get("review_status") or "Under Review",
                 "issue_from_stock_qty": item.get("issue_from_stock_qty", min(total_avail, req_qty)),
                 "purchase_req_qty": item.get("purchase_req_qty", max(0, req_qty - total_avail)),
-                "valuation_rate": item_master.get("valuation_rate") or item.get("estimated_rate") or 100
+                "valuation_rate": item_master.get("valuation_rate") or item.get("estimated_rate") or item.get("est_unit_rate") or 100
             })
 
         enriched_queue.append({
             **indent,
-            "department_name": dept.get("name", "Information Technology"),
-            "requested_by_name": usr.get("name", "Requisitioner User"),
+            "department_name": indent.get("department_name") or dept.get("name") or "Information Technology",
+            "requested_by_name": indent.get("requested_by_name") or indent.get("requester_name") or usr.get("name") or "Requisitioner User",
+            "total_estimated_amount": indent.get("total_estimated_amount") or indent.get("total_value") or sum(float(i.get("requested_qty", 1)) * float(i.get("valuation_rate", 100)) for i in enriched_items),
             "items": enriched_items
         })
 
@@ -242,10 +264,11 @@ def execute_stock_review_action(payload: Dict[str, Any]):
                 "item_name": item_name,
                 "required_qty": purchase_qty,
                 "target_date": indent.get("required_date"),
-                "status": "Draft",
+                "status": "Published",
                 "created_at": now_iso
             }
             db["rfqs"].append(rfq_doc)
+            save_db("rfqs")
 
         # 3. Update Line Item Review Status
         status_label = "Approved for Issue" if action_choice == "issue-full" else \
@@ -264,9 +287,11 @@ def execute_stock_review_action(payload: Dict[str, Any]):
         all_statuses = [i.get("review_status") for i in items if i.get("review_status") and i.get("review_status") != "Under Review"]
         if len(all_statuses) == len(items):
             if any(i.get("purchase_req_qty", 0) > 0 for i in items):
-                indent["status"] = "Partially fulfilled"
+                indent["status"] = "Forwarded to Procurement / RFQ Created"
             elif all(i.get("review_status") == "Approved for Issue" for i in items):
                 indent["status"] = "Fulfilled"
+
+        save_db("indents")
 
         # 5. Audit Log Entry
         db["audit_logs"].append({

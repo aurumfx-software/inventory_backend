@@ -235,7 +235,10 @@ def take_approval_action(req: ApprovalAction, approval_id: Optional[str] = None)
         "previous_status": old_status,
         "timestamp": now_iso
     }
-    db["approval_actions"].append(act_entry)
+    db["approval_actions"].insert(0, act_entry)
+
+    from db.database_store import add_notification
+    add_notification("Approval Decision Engine", f"{txn_type} requisition {txn_id} was {req.action.lower()}d by {req.user_name or 'Department Manager'}.", "success" if req.action == "Approve" else "warning", "ALL")
 
     # Record in audit log
     db["audit_logs"].append({

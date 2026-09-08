@@ -42,11 +42,14 @@ def get_rfqs(request: Request, x_user_email: str = Header(None), x_company_name:
     for rfq in rfq_list:
         sup_ids = rfq.get("supplier_ids", [])
         suppliers = [s for s in db.get("suppliers", []) if s["id"] in sup_ids]
+        rfq_date_val = rfq.get("rfq_date") or rfq.get("created_at", "").replace("T", " ")[:19] or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         enriched.append({
             **rfq,
+            "rfq_date": rfq_date_val,
             "suppliers": suppliers,
             "supplier_count": len(suppliers) or len(sup_ids)
         })
+    enriched.sort(key=lambda r: str(r.get("created_at") or r.get("rfq_date") or r.get("rfq_number") or r.get("id")), reverse=True)
     return {"success": True, "data": enriched}
 
 @router.post("/rfqs")
@@ -57,6 +60,7 @@ def create_or_update_rfq(payload: Dict[str, Any], request: Request, x_user_email
 
     rfq_id = payload.get("id")
     now_iso = datetime.now().isoformat()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Preserve snapshot of item master details per implementation rule!
     processed_items = []
@@ -105,7 +109,7 @@ def create_or_update_rfq(payload: Dict[str, Any], request: Request, x_user_email
         "company_name": company,
         "created_by": email,
         "is_sample": False,
-        "rfq_date": payload.get("rfq_date") or datetime.now().strftime("%Y-%m-%d"),
+        "rfq_date": payload.get("rfq_date") or now_str,
         "closing_date": payload.get("closing_date") or datetime.now().strftime("%Y-%m-%d"),
         "buyer": payload.get("buyer", "Sarah Jenkins (Super Administrator)"),
         "delivery_location": payload.get("delivery_location") or "Central Goods Warehouse (WH-MAIN)",
@@ -119,8 +123,11 @@ def create_or_update_rfq(payload: Dict[str, Any], request: Request, x_user_email
         "items": processed_items,
         "created_at": now_iso
     }
-    db["rfqs"].append(new_rfq)
+    db["rfqs"].insert(0, new_rfq)
     save_db("rfqs")
+
+    from db.database_store import add_notification
+    add_notification("New RFQ Published", f"RFQ {rfq_num} published for material procurement.", "info", "Purchase Manager")
 
     # Log Audit
     db["audit_logs"].append({
@@ -433,30 +440,130 @@ def update_quotation(qte_id: str, payload: Dict[str, Any]):
 @router.post("/quotation-comparisons/{rfq_id}/select")
 def select_winning_quotation(rfq_id: str, payload: Dict[str, Any]):
     selected_qte_id = payload.get("selected_quotation_id") or payload.get("quotation_id")
-    justification = str(payload.get("justification_reason", payload.get("reason", ""))).strip()
+    selected_sup_id = payload.get("selected_supplier_id") or payload.get("supplier_id")
+    justification = str(payload.get("justification_remarks") or payload.get("justification_reason") or payload.get("reason", "")).strip()
 
     q_list = [q for q in db.get("quotations", []) if q.get("rfq_id") == rfq_id or q.get("rfq_number") == rfq_id]
     if not q_list:
         q_list = db.get("quotations", [])
 
     lowest_q = min(q_list, key=lambda x: float(x.get("total_landed_cost", 999999999))) if q_list else None
+
+    # Resolve selected_qte_id if passed as supplier_id
+    if not selected_qte_id and selected_sup_id:
+        match_by_sup = next((q for q in q_list if q.get("supplier_id") == selected_sup_id), None)
+        if match_by_sup:
+            selected_qte_id = match_by_sup.get("id")
     
+    if not selected_qte_id and lowest_q:
+        selected_qte_id = lowest_q.get("id")
+
     # Important Rule Validation: If selected supplier is NOT the lowest bidder (L1), system MUST require a reason!
-    is_l1 = (lowest_q and (selected_qte_id == lowest_q.get("id") or selected_qte_id == lowest_q.get("quotation_number")))
+    is_l1 = (lowest_q and (selected_qte_id == lowest_q.get("id") or selected_qte_id == lowest_q.get("quotation_number") or selected_sup_id == lowest_q.get("supplier_id")))
     if lowest_q and not is_l1:
         if not justification:
             from fastapi import HTTPException
             raise HTTPException(status_code=400, detail="Non-L1 Selection Rule: Justification reason is mandatory when selecting a supplier with a higher bid than the lowest cost bidder (L1).")
 
-    # Mark selected quotation
+    # Mark selected quotation and generate PO
+    winning_q = None
     for q in db.get("quotations", []):
-        if q["id"] == selected_qte_id or q.get("quotation_number") == selected_qte_id:
+        matches_win = (selected_qte_id and (q["id"] == selected_qte_id or q.get("quotation_number") == selected_qte_id)) or \
+                      (selected_sup_id and q.get("supplier_id") == selected_sup_id and (q.get("rfq_id") == rfq_id or q.get("rfq_number") == rfq_id))
+        if matches_win:
             q["is_selected"] = True
             q["status"] = "Approved"
             q["selection_justification"] = justification
+            winning_q = q
         elif q.get("rfq_id") == rfq_id or q.get("rfq_number") == rfq_id:
             q["is_selected"] = False
             q["status"] = "Rejected"
+
+    if not winning_q and q_list:
+        winning_q = q_list[0]
+        winning_q["is_selected"] = True
+        winning_q["status"] = "Approved"
+
+    # Automatically generate Purchase Order (PO) for the winning supplier
+    if winning_q:
+        po_num = get_next_doc_number("PO")
+        sup_id = winning_q.get("supplier_id") or selected_sup_id or "sup-01"
+        sup = next((s for s in db.get("suppliers", []) if s["id"] == sup_id), {})
+        sup_name = winning_q.get("supplier_name") or sup.get("supplier_name", "Supplier Vendor")
+
+        q_items = winning_q.get("items", [])
+        po_items = []
+        for idx, item in enumerate(q_items):
+            ord_qty = float(item.get("offered_quantity", item.get("requested_qty", 1)))
+            unit_rate = float(item.get("unit_rate", 5000))
+            disc_pct = float(item.get("discount", 0))
+            tax_pct = float(item.get("tax", 18))
+            gross = ord_qty * unit_rate
+            disc_val = (gross * disc_pct) / 100.0
+            taxable = gross - disc_val
+            tax_val = (taxable * tax_pct) / 100.0
+            line_total = taxable + tax_val
+
+            po_items.append({
+                "id": f"poi-{idx+1}",
+                "item_id": item.get("item_id", "itm-01"),
+                "item_code": item.get("item_code", "ITM-DELL-5440"),
+                "item_name": item.get("item_name", "Dell Latitude 5440 Core i7 Laptop"),
+                "ordered_quantity": ord_qty,
+                "unit_rate": unit_rate,
+                "discount": disc_pct,
+                "tax": tax_pct,
+                "gross_amount": gross,
+                "discount_amount": disc_val,
+                "taxable_amount": taxable,
+                "tax_amount": tax_val,
+                "line_total": line_total
+            })
+
+        if not po_items:
+            po_items = [
+                {
+                    "id": "poi-01",
+                    "item_id": "itm-01",
+                    "item_code": "ITM-DELL-5440",
+                    "item_name": "Dell Latitude 5440 Core i7 Laptop",
+                    "ordered_quantity": 5,
+                    "unit_rate": 63000,
+                    "discount": 0,
+                    "tax": 18,
+                    "gross_amount": 315000,
+                    "tax_amount": 56700,
+                    "line_total": 371700
+                }
+            ]
+
+        tot_grand = sum(i["line_total"] for i in po_items)
+        tot_tax = sum(i.get("tax_amount", 0) for i in po_items)
+        tot_sub = tot_grand - tot_tax
+
+        new_po = {
+            "id": f"po-{len(db.get('purchase_orders', [])) + 1001}",
+            "po_number": po_num,
+            "company_name": winning_q.get("company_name", "Enterprise Head Office"),
+            "created_by": winning_q.get("created_by", "procurement@supermarket.com"),
+            "supplier_id": sup_id,
+            "supplier_name": sup_name,
+            "rfq_id": rfq_id,
+            "rfq_number": winning_q.get("rfq_number", rfq_id),
+            "po_date": datetime.now().strftime("%Y-%m-%d"),
+            "status": "Issued",
+            "payment_terms": winning_q.get("payment_terms", "Net 30 Days"),
+            "delivery_terms": winning_q.get("delivery_terms", "Door Delivery"),
+            "subtotal": tot_sub,
+            "tax_total": tot_tax,
+            "grand_total": tot_grand,
+            "items": po_items,
+            "created_at": datetime.now().isoformat()
+        }
+
+        if "purchase_orders" not in db:
+            db["purchase_orders"] = []
+        db["purchase_orders"].insert(0, new_po)
 
     # Store selection decision in quotation_selection_decisions table
     if "quotation_selection_decisions" not in db:
@@ -474,7 +581,7 @@ def select_winning_quotation(rfq_id: str, payload: Dict[str, Any]):
     db["quotation_selection_decisions"].append(decision)
 
     save_db()
-    return {"success": True, "data": decision, "message": f"Supplier selection decision recorded successfully. (L1: {is_l1})"}
+    return {"success": True, "data": decision, "message": f"Supplier selection decision recorded & Purchase Order created successfully. (L1: {is_l1})"}
 
 # =========================================================================
 # PURCHASE ORDER MANAGEMENT
@@ -483,7 +590,15 @@ def select_winning_quotation(rfq_id: str, payload: Dict[str, Any]):
 def get_purchase_orders(request: Request, x_user_email: str = Header(None), x_company_name: str = Header(None), x_user_role: str = Header(None)):
     email, company, role = get_auth_context(request, x_user_email, x_company_name, x_user_role)
     data = filter_by_user_or_company(db.get("purchase_orders", []), email, company, role)
-    return {"success": True, "data": data}
+    enriched = []
+    for po in data:
+        po_date_val = po.get("po_date") or po.get("created_at", "").replace("T", " ")[:19] or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        enriched.append({
+            **po,
+            "po_date": po_date_val
+        })
+    enriched.sort(key=lambda p: str(p.get("created_at") or p.get("po_date") or p.get("po_number") or p.get("id")), reverse=True)
+    return {"success": True, "data": enriched}
 
 @router.post("/purchase-orders")
 def create_purchase_order(payload: Dict[str, Any], request: Request, x_user_email: str = Header(None), x_company_name: str = Header(None)):
@@ -553,7 +668,7 @@ def create_purchase_order(payload: Dict[str, Any], request: Request, x_user_emai
         "indent_id": payload.get("indent_id", ""),
         "indent_number": payload.get("indent_number", ""),
         "terms_conditions": payload.get("terms_conditions", ""),
-        "po_date": payload.get("po_date") or datetime.now().strftime("%Y-%m-%d"),
+        "po_date": payload.get("po_date") or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "delivery_date": payload.get("delivery_date") or datetime.now().strftime("%Y-%m-%d"),
         "warehouse_id": payload.get("warehouse_id") or "wh-01",
         "subtotal": subtotal,
@@ -563,8 +678,11 @@ def create_purchase_order(payload: Dict[str, Any], request: Request, x_user_emai
         "items": processed_items,
         "created_at": datetime.now().isoformat()
     }
-    db["purchase_orders"].append(new_po)
+    db["purchase_orders"].insert(0, new_po)
     save_db("purchase_orders")
+
+    from db.database_store import add_notification
+    add_notification("New Purchase Order Released", f"PO {po_num} released to {sup_name} for ₹{total_amt:,.2f}.", "success", "Finance Manager")
     return {"success": True, "data": new_po, "message": f"Purchase Order {po_num} created successfully."}
 
 @router.get("/purchase-orders/{po_id}")

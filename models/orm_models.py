@@ -253,6 +253,11 @@ class AuditLog(Base):
     id = Column(String(100), primary_key=True, index=True)
     payload = Column(JSON, nullable=False, default={})
 
+class OTPVerification(Base):
+    __tablename__ = "otps"
+    id = Column(String(100), primary_key=True, index=True)
+    payload = Column(JSON, nullable=False, default={})
+
 class SystemSetting(Base):
     __tablename__ = "settings"
     key = Column(String(100), primary_key=True, index=True)
@@ -307,5 +312,6 @@ TABLE_MODEL_MAP = {
     "stock_reservations": StockReservation,
     "assets": Asset,
     "notifications": Notification,
-    "audit_logs": AuditLog
+    "audit_logs": AuditLog,
+    "otps": OTPVerification
 }
