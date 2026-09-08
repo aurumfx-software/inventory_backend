@@ -18,14 +18,16 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 
+import time
+
 # Engine setup with connection pool optimization for DigitalOcean Managed PostgreSQL
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
-    pool_size=20,
-    max_overflow=30,
-    pool_recycle=300,
-    pool_timeout=30
+    pool_size=10,
+    max_overflow=15,
+    pool_recycle=60,
+    pool_timeout=3
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -40,13 +42,23 @@ def get_db():
     finally:
         db_session.close()
 
+_db_online_cache = {"status": True, "time": 0}
+
 def check_db_connection() -> bool:
-    """Check if connection to PostgreSQL database is alive."""
+    """Check if connection to PostgreSQL database is alive (cached for 10 seconds)."""
+    now = time.time()
+    if now - _db_online_cache["time"] < 10:
+        return _db_online_cache["status"]
+
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
+        _db_online_cache["status"] = True
+        _db_online_cache["time"] = now
         return True
     except Exception as e:
+        _db_online_cache["status"] = False
+        _db_online_cache["time"] = now
         print(f"[DB WARN] Could not connect to PostgreSQL ({POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}): {e}")
         return False
 
