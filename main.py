@@ -196,4 +196,5 @@ def healthcheck():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    is_dev = os.getenv("ENVIRONMENT", "production").lower() in ["dev", "development"]
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=is_dev)
