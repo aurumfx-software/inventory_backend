@@ -41,7 +41,7 @@ def create_indent(payload: dict, request: Request, x_user_email: str = Header(No
     email, company, role = get_auth_context(request, x_user_email, x_company_name, None)
     # Validations per requirements:
     # 1. Purpose is mandatory
-    purpose = payload.get("purpose", "").strip()
+    purpose = (payload.get("purpose") or "").strip()
     if not purpose:
         raise HTTPException(status_code=400, detail="Purpose is mandatory for material indents.")
 
@@ -52,27 +52,36 @@ def create_indent(payload: dict, request: Request, x_user_email: str = Header(No
 
     # 3. Urgent/Emergency requests require justification
     priority = payload.get("priority", "Normal")
-    priority_justification = payload.get("priority_justification", "").strip()
+    priority_justification = (payload.get("priority_justification") or "").strip()
     if priority in ["Urgent", "Emergency"] and not priority_justification:
         raise HTTPException(status_code=400, detail="Urgent or Emergency requests require a justification explanation.")
 
-    # Check for inactive items or invalid quantities
+    # Check for inactive items or invalid quantities safely
     for item in items:
-        qty = float(item.get("requested_qty", 0))
+        qty = float(item.get("requested_qty") or item.get("qty") or item.get("quantity") or 0)
         if qty <= 0:
             raise HTTPException(status_code=400, detail="Quantity must be greater than zero.")
-        item_obj = next((i for i in db.get("items", []) if i["id"] == item.get("item_id")), {})
+        target_id = item.get("item_id") or item.get("id") or item.get("item_code")
+        item_obj = next((i for i in db.get("items", []) if str(i.get("id")) == str(target_id) or str(i.get("item_code")) == str(target_id)), {})
         if item_obj and item_obj.get("is_active") is False:
-            raise HTTPException(status_code=400, detail=f"Item {item_obj.get('item_name')} is inactive and cannot be requested.")
+            raise HTTPException(status_code=400, detail=f"Item {item_obj.get('name') or item_obj.get('item_name')} is inactive and cannot be requested.")
 
     indent_num = get_next_doc_number("IND")
-    new_id = f"ind-{len(db['indents']) + 1002}"
+    new_id = f"ind-{len(db.get('indents', [])) + 1002}"
     now = datetime.now().isoformat()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cost_centre_val = payload.get("cost_centre_or_project") or payload.get("cost_centre") or "IT-001"
 
-    # Calculate total estimated amount
-    total_est = sum(float(i.get("requested_qty", 1)) * float(i.get("estimated_rate", 0)) for i in items)
+    user_obj = next((u for u in db.get("users", []) if str(u.get("email", "")).lower() == email.lower()), None)
+    req_by_id = payload.get("requested_by") or (user_obj.get("id") if user_obj else "usr-05")
+    dept_id = payload.get("department_id") or (user_obj.get("department_id") if user_obj else "dept-01")
+
+    # Calculate total estimated amount safely
+    total_est = 0
+    for i in items:
+        q = float(i.get("requested_qty") or i.get("qty") or i.get("quantity") or 1)
+        r = float(i.get("estimated_rate") or i.get("unit_price") or i.get("rate") or i.get("valuation_rate") or 1000)
+        total_est += q * r
 
     new_indent = {
         "id": new_id,
@@ -81,8 +90,8 @@ def create_indent(payload: dict, request: Request, x_user_email: str = Header(No
         "company_name": company,
         "created_by": email,
         "is_sample": False,
-        "department_id": payload.get("department_id") or "dept-01",
-        "requested_by": payload.get("requested_by") or "usr-05",
+        "department_id": dept_id,
+        "requested_by": req_by_id,
         "required_date": payload.get("required_date") or datetime.now().strftime("%Y-%m-%d"),
         "purpose": purpose,
         "priority": priority,
@@ -95,8 +104,8 @@ def create_indent(payload: dict, request: Request, x_user_email: str = Header(No
         "items": items,
         "created_at": now
     }
-    
-    db["indents"].insert(0, new_indent)
+
+    db.setdefault("indents", []).insert(0, new_indent)
     save_db("indents")
 
     from db.database_store import add_notification
@@ -104,7 +113,7 @@ def create_indent(payload: dict, request: Request, x_user_email: str = Header(No
 
     # Workflow request creation
     approval = {
-        "id": f"app-{len(db['approval_requests']) + 1}",
+        "id": f"app-{len(db.get('approval_requests', [])) + 1}",
         "transaction_type": "INDENT",
         "transaction_id": new_id,
         "approval_level": 1,
@@ -113,11 +122,11 @@ def create_indent(payload: dict, request: Request, x_user_email: str = Header(No
         "status": "Pending",
         "comments": ""
     }
-    db["approval_requests"].insert(0, approval)
+    db.setdefault("approval_requests", []).insert(0, approval)
 
-    db["audit_logs"].append({
-        "id": f"aud-{len(db['audit_logs']) + 1}",
-        "user_id": payload.get("requested_by") or "usr-05",
+    db.setdefault("audit_logs", []).append({
+        "id": f"aud-{len(db.get('audit_logs', [])) + 1}",
+        "user_id": req_by_id,
         "action": "INDENT_SUBMITTED" if new_indent["status"] == "Submitted" else "INDENT_DRAFT_CREATED",
         "module": "PROCUREMENT",
         "record_id": new_id,
@@ -126,7 +135,8 @@ def create_indent(payload: dict, request: Request, x_user_email: str = Header(No
         "ip_address": "127.0.0.1"
     })
 
-    save_db()
+    save_db("approval_requests")
+    save_db("audit_logs")
     return {"success": True, "data": new_indent}
 
 @router.get("/stock-review-queue")

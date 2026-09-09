@@ -76,7 +76,7 @@ def add_notification(title: str, message: str, notif_type: str = "info", target_
     save_db("notifications")
     return notif
 
-def save_db(target_table: str = None):
+def save_db(target_table: str = None, purge_deleted: bool = False):
     """Save/Persist current database state exclusively to PostgreSQL database tables configured in .env."""
     try:
         from db.database import check_db_connection, SessionLocal, engine, Base
@@ -122,11 +122,12 @@ def save_db(target_table: str = None):
                 for item_id, payload_val in dedup_map.items():
                     session.merge(model_cls(id=item_id, payload=payload_val))
 
-                # Clean up deleted records
-                if current_ids:
-                    session.query(model_cls).filter(~model_cls.id.in_(current_ids)).delete(synchronize_session=False)
-                else:
-                    session.query(model_cls).delete(synchronize_session=False)
+                # Clean up deleted records ONLY if purge_deleted=True
+                if purge_deleted:
+                    if current_ids:
+                        session.query(model_cls).filter(~model_cls.id.in_(current_ids)).delete(synchronize_session=False)
+                    else:
+                        session.query(model_cls).delete(synchronize_session=False)
 
             session.commit()
             print(f"[POSTGRES DB SUCCESS] Saved state to PostgreSQL table '{target_table or 'all tables'}' successfully.")
@@ -537,7 +538,7 @@ def get_next_doc_number(doc_type: str) -> str:
     curr = db["settings"]["numbering_series"].get(doc_type, 1000)
     next_val = curr + 1
     db["settings"]["numbering_series"][doc_type] = next_val
-    save_db()
+    save_db("settings")
     
     year = datetime.now().year
     return f"{doc_type}-{year}-{str(next_val).zfill(6)}"
