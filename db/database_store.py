@@ -76,7 +76,7 @@ def add_notification(title: str, message: str, notif_type: str = "info", target_
     save_db("notifications")
     return notif
 
-def save_db(target_table: str = None, purge_deleted: bool = False):
+def save_db(target_table: str = None, purge_deleted: bool = False, record: Any = None):
     """Save/Persist current database state exclusively to PostgreSQL database tables configured in .env."""
     try:
         from db.database import check_db_connection, SessionLocal, engine, Base
@@ -103,9 +103,14 @@ def save_db(target_table: str = None, purge_deleted: bool = False):
                 if not model_cls:
                     continue
 
-                records = db.get(table_name, [])
-                if not isinstance(records, list):
-                    continue
+                if record is not None and (target_table == table_name or not target_table):
+                    records = [record] if isinstance(record, dict) else (record if isinstance(record, list) else [record])
+                else:
+                    records = db.get(table_name, [])
+                    if not isinstance(records, list):
+                        continue
+                    if len(records) > 30 and not purge_deleted:
+                        records = records[:30]
 
                 # Deduplicate records by ID to prevent PostgreSQL UniqueViolation batch errors
                 dedup_map = {}

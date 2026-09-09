@@ -106,7 +106,7 @@ def create_indent(payload: dict, request: Request, x_user_email: str = Header(No
     }
 
     db.setdefault("indents", []).insert(0, new_indent)
-    save_db("indents")
+    save_db("indents", record=new_indent)
 
     from db.database_store import add_notification
     add_notification("New Material Indent Requisition", f"Indent {indent_num} submitted for '{purpose}'.", "info", "Department Manager")
@@ -124,7 +124,7 @@ def create_indent(payload: dict, request: Request, x_user_email: str = Header(No
     }
     db.setdefault("approval_requests", []).insert(0, approval)
 
-    db.setdefault("audit_logs", []).append({
+    audit_entry = {
         "id": f"aud-{len(db.get('audit_logs', [])) + 1}",
         "user_id": req_by_id,
         "action": "INDENT_SUBMITTED" if new_indent["status"] == "Submitted" else "INDENT_DRAFT_CREATED",
@@ -133,10 +133,11 @@ def create_indent(payload: dict, request: Request, x_user_email: str = Header(No
         "details": f"Created Indent Requisition {indent_num} with Cost Centre/Project {cost_centre_val}",
         "timestamp": now,
         "ip_address": "127.0.0.1"
-    })
+    }
+    db.setdefault("audit_logs", []).append(audit_entry)
 
-    save_db("approval_requests")
-    save_db("audit_logs")
+    save_db("approval_requests", record=approval)
+    save_db("audit_logs", record=audit_entry)
     return {"success": True, "data": new_indent}
 
 @router.get("/stock-review-queue")
