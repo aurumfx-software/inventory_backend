@@ -70,6 +70,32 @@ def enrich_approval_request(app_req: dict) -> dict:
 @router.get("")
 @router.get("/requests")
 def get_approval_requests():
+    if "approval_requests" not in db:
+        db["approval_requests"] = []
+
+    # Ensure all submitted or pending indents have an active approval_request record
+    existing_txn_ids = {str(a.get("transaction_id")) for a in db["approval_requests"]}
+    
+    for ind in db.get("indents", []):
+        ind_id = str(ind.get("id"))
+        ind_num = str(ind.get("indent_number"))
+        status = str(ind.get("status", "")).strip()
+        
+        if status in ["Submitted", "Under Review", "Pending Department Approval", "Pending", "Draft"] and ind_id not in existing_txn_ids and ind_num not in existing_txn_ids:
+            new_app = {
+                "id": f"app-{len(db['approval_requests']) + 1}",
+                "transaction_type": "INDENT",
+                "transaction_id": ind.get("id"),
+                "approval_level": 1,
+                "approver_id": "usr-test-03",
+                "approver_name": "Arun Department Manager",
+                "assigned_date": ind.get("created_at") or datetime.now().isoformat(),
+                "status": "Pending",
+                "comments": ""
+            }
+            db["approval_requests"].insert(0, new_app)
+            existing_txn_ids.add(ind_id)
+
     reqs = db.get("approval_requests", [])
     enriched = [enrich_approval_request(r) for r in reqs]
     return {"success": True, "data": enriched}
