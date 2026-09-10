@@ -198,7 +198,6 @@ def load_db():
             print("[POSTGRES DB WARN] PostgreSQL database is not accessible. Please check backend/.env configuration.")
             return db
 
-        Base.metadata.create_all(bind=engine)
         session = SessionLocal()
         try:
             # Load settings from PostgreSQL

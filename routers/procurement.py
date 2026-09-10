@@ -41,7 +41,7 @@ def get_rfqs(request: Request, x_user_email: str = Header(None), x_company_name:
     enriched = []
     for rfq in rfq_list:
         sup_ids = rfq.get("supplier_ids", [])
-        suppliers = [s for s in db.get("suppliers", []) if s["id"] in sup_ids]
+        suppliers = [s for s in db.get("suppliers", []) if s.get("id") in sup_ids]
         rfq_date_val = rfq.get("rfq_date") or rfq.get("created_at", "").replace("T", " ")[:19] or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         enriched.append({
             **rfq,
@@ -146,16 +146,16 @@ def create_or_update_rfq(payload: Dict[str, Any], request: Request, x_user_email
 
 @router.get("/rfqs/{rfq_id}")
 def get_rfq(rfq_id: str):
-    rfq = next((r for r in db.get("rfqs", []) if r["id"] == rfq_id or r.get("rfq_number") == rfq_id), None)
+    rfq = next((r for r in db.get("rfqs", []) if r.get("id") == rfq_id or r.get("rfq_number") == rfq_id), None)
     if rfq:
         sup_ids = rfq.get("supplier_ids", [])
-        suppliers = [s for s in db.get("suppliers", []) if s["id"] in sup_ids]
+        suppliers = [s for s in db.get("suppliers", []) if s.get("id") in sup_ids]
         return {"success": True, "data": {**rfq, "suppliers": suppliers}}
     return {"success": False, "message": "RFQ not found"}
 
 @router.post("/rfqs/{rfq_id}/send")
 def send_rfq(rfq_id: str, payload: Optional[Dict[str, Any]] = None):
-    rfq = next((r for r in db.get("rfqs", []) if r["id"] == rfq_id or r.get("rfq_number") == rfq_id), None)
+    rfq = next((r for r in db.get("rfqs", []) if r.get("id") == rfq_id or r.get("rfq_number") == rfq_id), None)
     if rfq:
         now_iso = datetime.now().isoformat()
         rfq["status"] = "Sent"
@@ -170,7 +170,7 @@ def send_rfq(rfq_id: str, payload: Optional[Dict[str, Any]] = None):
 
         log_entry = {
             "id": f"log-{len(db['rfq_email_logs']) + 1}",
-            "rfq_id": rfq["id"],
+            "rfq_id": rfq.get("id"),
             "rfq_number": rfq.get("rfq_number"),
             "send_method": send_method,
             "recipient_emails": recipient_emails,
@@ -185,7 +185,7 @@ def send_rfq(rfq_id: str, payload: Optional[Dict[str, Any]] = None):
             "user_id": "usr-01",
             "action": "RFQ_DISPATCHED",
             "module": "PROCUREMENT",
-            "record_id": rfq["id"],
+            "record_id": rfq.get("id"),
             "details": f"Dispatched RFQ {rfq.get('rfq_number')} via {send_method} to {recipient_emails}",
             "timestamp": now_iso,
             "ip_address": "127.0.0.1"
@@ -197,7 +197,7 @@ def send_rfq(rfq_id: str, payload: Optional[Dict[str, Any]] = None):
 
 @router.post("/rfqs/{rfq_id}/close")
 def close_rfq(rfq_id: str):
-    rfq = next((r for r in db.get("rfqs", []) if r["id"] == rfq_id or r.get("rfq_number") == rfq_id), None)
+    rfq = next((r for r in db.get("rfqs", []) if r.get("id") == rfq_id or r.get("rfq_number") == rfq_id), None)
     if rfq:
         rfq["status"] = "Closed"
         save_db()
@@ -206,12 +206,12 @@ def close_rfq(rfq_id: str):
 
 @router.get("/rfqs/{rfq_id}/supplier-status")
 def get_rfq_supplier_status(rfq_id: str):
-    rfq = next((r for r in db.get("rfqs", []) if r["id"] == rfq_id or r.get("rfq_number") == rfq_id), None)
+    rfq = next((r for r in db.get("rfqs", []) if r.get("id") == rfq_id or r.get("rfq_number") == rfq_id), None)
     sup_ids = rfq.get("supplier_ids", ["sup-01", "sup-02"]) if rfq else ["sup-01", "sup-02"]
     
     status_list = []
     for idx, sid in enumerate(sup_ids):
-        sup = next((s for s in db.get("suppliers", []) if s["id"] == sid), {})
+        sup = next((s for s in db.get("suppliers", []) if s.get("id") == sid), {})
         status_list.append({
             "supplier_id": sid,
             "supplier_code": sup.get("supplier_code", f"SUP-000{idx+45}"),
@@ -229,7 +229,7 @@ def get_rfq_supplier_status(rfq_id: str):
 @router.delete("/rfqs/{rfq_id}")
 def delete_rfq(rfq_id: str):
     initial_len = len(db.get("rfqs", []))
-    db["rfqs"] = [r for r in db.get("rfqs", []) if r["id"] != rfq_id and r.get("rfq_number") != rfq_id]
+    db["rfqs"] = [r for r in db.get("rfqs", []) if r.get("id") != rfq_id and r.get("rfq_number") != rfq_id]
     if len(db["rfqs"]) < initial_len:
         save_db()
         return {"success": True, "message": "RFQ deleted successfully"}
@@ -242,7 +242,7 @@ def get_rfq_comparison(rfq_id: str):
     if "quotations" not in db:
         db["quotations"] = []
 
-    rfq = next((r for r in db["rfqs"] if r["id"] == rfq_id or r.get("rfq_number") == rfq_id), db["rfqs"][0] if db["rfqs"] else None)
+    rfq = next((r for r in db["rfqs"] if r.get("id") == rfq_id or r.get("rfq_number") == rfq_id), db["rfqs"][0] if db["rfqs"] else None)
 
     if not rfq:
         rfq = {
