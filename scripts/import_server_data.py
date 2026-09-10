@@ -21,11 +21,34 @@ def import_server_db():
         
     with open(export_path, "r", encoding="utf-8") as f:
         imported_db = json.load(f)
-        
+    
+    # Load all imported data into the in-memory db
     for k, v in imported_db.items():
         db[k] = v
-        
-    save_db()
+    
+    # Print summary of what we're importing
+    print("Data to import:")
+    for k, v in db.items():
+        if isinstance(v, list) and len(v) > 0:
+            print(f"  - {k}: {len(v)} records")
+        elif isinstance(v, dict) and len(v) > 0:
+            print(f"  - {k}: {len(v)} keys")
+    
+    # Save ALL records to PostgreSQL, table by table, with purge_deleted=True
+    # This ensures complete sync and removes any stale server records
+    print("\nSyncing to PostgreSQL (full sync with purge_deleted=True)...")
+    
+    # First save settings
+    save_db("settings", purge_deleted=True)
+    print("  [OK] settings")
+    
+    # Then save each table individually for reliable complete sync
+    from models.orm_models import TABLE_MODEL_MAP
+    for table_name in TABLE_MODEL_MAP.keys():
+        if table_name in db:
+            save_db(table_name, purge_deleted=True)
+            count = len(db[table_name]) if isinstance(db[table_name], list) else 0
+            print(f"  [OK] {table_name}: {count} records synced")
     
     print("\n=================================================================")
     print(" [SUCCESS] ALL LOCAL DATA, TEST USERS, STOCKS, INDENTS & PAGE DATA")

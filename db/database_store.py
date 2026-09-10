@@ -110,8 +110,7 @@ def save_db(target_table: str = None, purge_deleted: bool = False, record: Any =
                     records = db.get(table_name, [])
                     if not isinstance(records, list):
                         continue
-                    if len(records) > 30 and not purge_deleted:
-                        records = records[:30]
+                    # No record limit — sync ALL records to PostgreSQL
 
                 # Deduplicate records by ID to prevent PostgreSQL UniqueViolation batch errors
                 dedup_map = {}
