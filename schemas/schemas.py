@@ -32,6 +32,13 @@ class ItemCreate(BaseModel):
     uom_id: Optional[str] = None
     purchase_uom_id: Optional[str] = None
     tax_rate_id: Optional[str] = None
+    tax_percentage: Optional[float] = 5.0
+    tax_name: Optional[str] = "GST 5%"
+    enable_gst: Optional[bool] = True
+    gst_rate: Optional[float] = 5.0
+    cgst_rate: Optional[float] = 2.5
+    sgst_rate: Optional[float] = 2.5
+    igst_rate: Optional[float] = 5.0
     hsn_sac_code: Optional[str] = ""
     min_stock_level: Optional[float] = 0
     max_stock_level: Optional[float] = 0

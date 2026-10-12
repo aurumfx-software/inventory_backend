@@ -53,7 +53,14 @@ db = {
     "assets": [],
     "otps": [],
     "notifications": [],
-    "settings": {}
+    "settings": {},
+    # Billing Module Tables
+    "billing_customers": [],
+    "invoices": [],
+    "invoice_items": [],
+    "payments": [],
+    "returns": [],
+    "return_items": []
 }
 
 def add_notification(title: str, message: str, notif_type: str = "info", target_role: str = "ALL"):
@@ -125,7 +132,20 @@ def save_db(target_table: str = None, purge_deleted: bool = False, record: Any =
 
                 current_ids = set(dedup_map.keys())
                 for item_id, payload_val in dedup_map.items():
-                    session.merge(model_cls(id=item_id, payload=payload_val))
+                    model_kwargs = {"id": item_id, "payload": payload_val}
+                    if isinstance(payload_val, dict):
+                        for col_name in model_cls.__table__.columns.keys():
+                            if col_name not in ("id", "payload") and col_name in payload_val:
+                                val = payload_val[col_name]
+                                # Type coercion for specific numeric columns if needed
+                                if col_name == "items_count" and val is not None:
+                                    try: val = int(val)
+                                    except: val = 1
+                                elif col_name in ("grand_total", "unit_price", "mrp", "quantity") and val is not None:
+                                    try: val = float(val)
+                                    except: val = 0.0
+                                model_kwargs[col_name] = val
+                    session.merge(model_cls(**model_kwargs))
 
                 # Clean up deleted records ONLY if purge_deleted=True
                 if purge_deleted:
@@ -197,6 +217,41 @@ def load_db():
             print("[POSTGRES DB WARN] PostgreSQL database is not accessible. Please check backend/.env configuration.")
             return db
 
+        Base.metadata.create_all(bind=engine)
+
+        # Ensure explicit relational columns exist in PostgreSQL for direct pgAdmin viewing
+        try:
+            from sqlalchemy import text
+            with engine.begin() as conn:
+                conn.execute(text("""
+                    ALTER TABLE billing_customers ADD COLUMN IF NOT EXISTS name VARCHAR(150);
+                    ALTER TABLE billing_customers ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
+                    ALTER TABLE billing_customers ADD COLUMN IF NOT EXISTS email VARCHAR(150);
+                    ALTER TABLE billing_customers ADD COLUMN IF NOT EXISTS address VARCHAR(300);
+                    ALTER TABLE billing_customers ADD COLUMN IF NOT EXISTS created_at VARCHAR(50);
+
+                    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS invoice_number VARCHAR(50);
+                    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS customer_name VARCHAR(150);
+                    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(50);
+                    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS customer_email VARCHAR(150);
+                    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS customer_address VARCHAR(300);
+                    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS created_at VARCHAR(50);
+                    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS items_count INTEGER DEFAULT 0;
+                    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS grand_total DOUBLE PRECISION DEFAULT 0.0;
+                    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50);
+                    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50);
+
+                    ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS invoice_id VARCHAR(100);
+                    ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS product_id VARCHAR(100);
+                    ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS product_name VARCHAR(255);
+                    ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS sku VARCHAR(100);
+                    ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS quantity DOUBLE PRECISION DEFAULT 1;
+                    ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS unit_price DOUBLE PRECISION DEFAULT 0;
+                    ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS mrp DOUBLE PRECISION DEFAULT 0;
+                """))
+        except Exception as _schema_err:
+            pass
+
         session = SessionLocal()
         try:
             # Load settings from PostgreSQL
@@ -215,7 +270,16 @@ def load_db():
             for table_name, model_cls in TABLE_MODEL_MAP.items():
                 rows = session.query(model_cls).all()
                 if rows:
-                    db[table_name] = [r.payload for r in rows if r.payload]
+                    items_list = []
+                    for r in rows:
+                        p = dict(r.payload) if isinstance(r.payload, dict) else {"id": r.id}
+                        for col in r.__table__.columns.keys():
+                            if col != "payload":
+                                v = getattr(r, col, None)
+                                if v is not None and (col not in p or not p[col]):
+                                    p[col] = v
+                        items_list.append(p)
+                    db[table_name] = items_list
                     loaded_any = True
                 else:
                     db[table_name] = []
@@ -274,7 +338,8 @@ def seed_initial_data():
         {"id": "role-dept-mgr", "name": "Department Manager", "description": "Approve department indents & view consumption budgets"},
         {"id": "role-requester", "name": "Employee / Requester", "description": "Create material indents & track requests"},
         {"id": "role-finance", "name": "Finance User", "description": "Review PO values, tax verification & financial approvals"},
-        {"id": "role-auditor", "name": "Auditor", "description": "Read-only access to audit logs, stock ledger & reports"}
+        {"id": "role-auditor", "name": "Auditor", "description": "Read-only access to audit logs, stock ledger & reports"},
+        {"id": "role-biller", "name": "Biller", "description": "POS Billing - Create invoices, manage payments, view billing history"}
     ]
 
     db["permissions"] = [
@@ -293,7 +358,8 @@ def seed_initial_data():
 
     db["users"] = [
         {"id": "usr-01", "name": "System Administrator", "email": "admin@company.com", "phone": "9876543210", "password": "admin123", "role_id": "role-admin", "emp_code": "EMP-001", "department_id": "dept-01", "company_name": "Apex Enterprises", "is_active": True},
-        {"id": "usr-ashin", "name": "Ashin Demo Administrator", "email": "ashina123@gmail.com", "phone": "8111814075", "password": "ashin123", "role_id": "role-admin", "emp_code": "EMP-110", "department_id": "dept-01", "company_name": "Ashin Enterprise Demo", "is_demo": True, "is_active": True}
+        {"id": "usr-ashin", "name": "Ashin Demo Administrator", "email": "ashina123@gmail.com", "phone": "8111814075", "password": "ashin123", "role_id": "role-admin", "emp_code": "EMP-110", "department_id": "dept-01", "company_name": "Ashin Enterprise Demo", "is_demo": True, "is_active": True},
+        {"id": "usr-biller-01", "name": "Biller", "email": "biller@gmail.com", "phone": "9000000099", "password": "Test@123", "role_id": "role-biller", "emp_code": "EMP-099", "department_id": "dept-01", "company_name": "Apex Enterprises", "is_active": True}
     ]
 
     db["departments"] = [

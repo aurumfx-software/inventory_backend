@@ -16,5 +16,6 @@ if __name__ == "__main__":
     print(f" Starting Inventory & Procurement FastAPI Server...")
     print(f" Host: {host} | Port: {port}")
     print("===================================================")
-    uvicorn.run("main:app", host=host, port=port, reload=is_dev)
+    backend_dir = os.path.dirname(os.path.abspath(__file__))
+    uvicorn.run("main:app", host=host, port=port, reload=is_dev, app_dir=backend_dir)
 

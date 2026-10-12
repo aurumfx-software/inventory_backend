@@ -258,6 +258,70 @@ class OTPVerification(Base):
     id = Column(String(100), primary_key=True, index=True)
     payload = Column(JSON, nullable=False, default={})
 
+# ── Billing Module Models ─────────────────────────────────────────────────────
+
+class BillingCustomer(Base):
+    __tablename__ = "billing_customers"
+    id = Column(String(100), primary_key=True, index=True)
+    name = Column(String(150), nullable=True)
+    phone = Column(String(50), nullable=True)
+    email = Column(String(150), nullable=True)
+    address = Column(String(300), nullable=True)
+    created_at = Column(String(50), nullable=True)
+    payload = Column(JSON, nullable=False, default={})
+
+class Invoice(Base):
+    __tablename__ = "invoices"
+    id = Column(String(100), primary_key=True, index=True)
+    invoice_number = Column(String(50), nullable=True, index=True)
+    customer_name = Column(String(150), nullable=True)
+    customer_phone = Column(String(50), nullable=True)
+    customer_email = Column(String(150), nullable=True)
+    customer_address = Column(String(300), nullable=True)
+    created_at = Column(String(50), nullable=True)
+    items_count = Column(Integer, nullable=True, default=0)
+    grand_total = Column(Float, nullable=True, default=0.0)
+    payment_method = Column(String(50), nullable=True)
+    payment_status = Column(String(50), nullable=True)
+    payload = Column(JSON, nullable=False, default={})
+
+class InvoiceItem(Base):
+    __tablename__ = "invoice_items"
+    id = Column(String(100), primary_key=True, index=True)
+    invoice_id = Column(String(100), nullable=True, index=True)
+    product_id = Column(String(100), nullable=True)
+    product_name = Column(String(255), nullable=True)
+    sku = Column(String(100), nullable=True)
+    quantity = Column(Float, nullable=True, default=1.0)
+    unit_price = Column(Float, nullable=True, default=0.0)
+    mrp = Column(Float, nullable=True, default=0.0)
+    payload = Column(JSON, nullable=False, default={})
+
+class Payment(Base):
+    __tablename__ = "payments"
+    id = Column(String(100), primary_key=True, index=True)
+    payload = Column(JSON, nullable=False, default={})
+
+class BillingReturn(Base):
+    __tablename__ = "returns"
+    id = Column(String(100), primary_key=True, index=True)
+    payload = Column(JSON, nullable=False, default={})
+
+class BillingReturnItem(Base):
+    __tablename__ = "return_items"
+    id = Column(String(100), primary_key=True, index=True)
+    payload = Column(JSON, nullable=False, default={})
+
+class QuotationSelectionDecision(Base):
+    __tablename__ = "quotation_selection_decisions"
+    id = Column(String(100), primary_key=True, index=True)
+    payload = Column(JSON, nullable=False, default={})
+
+class ApprovalDelegation(Base):
+    __tablename__ = "approval_delegations"
+    id = Column(String(100), primary_key=True, index=True)
+    payload = Column(JSON, nullable=False, default={})
+
 class SystemSetting(Base):
     __tablename__ = "settings"
     key = Column(String(100), primary_key=True, index=True)
@@ -288,11 +352,13 @@ TABLE_MODEL_MAP = {
     "approval_workflows": ApprovalWorkflow,
     "approval_requests": ApprovalRequest,
     "approval_actions": ApprovalAction,
+    "approval_delegations": ApprovalDelegation,
     "rfqs": RFQ,
     "rfq_items": RFQItem,
     "rfq_suppliers": RFQSupplier,
     "quotations": Quotation,
     "quotation_items": QuotationItem,
+    "quotation_selection_decisions": QuotationSelectionDecision,
     "purchase_orders": PurchaseOrder,
     "po_items": POItem,
     "goods_receipts": GoodsReceipt,
@@ -313,5 +379,12 @@ TABLE_MODEL_MAP = {
     "assets": Asset,
     "notifications": Notification,
     "audit_logs": AuditLog,
-    "otps": OTPVerification
+    "otps": OTPVerification,
+    # Billing Module Tables
+    "billing_customers": BillingCustomer,
+    "invoices": Invoice,
+    "invoice_items": InvoiceItem,
+    "payments": Payment,
+    "returns": BillingReturn,
+    "return_items": BillingReturnItem
 }

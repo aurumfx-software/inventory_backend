@@ -210,7 +210,7 @@ def delete_delegation(del_id: str):
 @router.post("/{approval_id}/action")
 def take_approval_action(req: ApprovalAction, approval_id: Optional[str] = None):
     app_id = req.approval_id or approval_id
-    app_req = next((a for a in db.get("approval_requests", []) if a.get("id") == app_id), None)
+    app_req = next((a for a in db.get("approval_requests", []) if str(a.get("id")) == str(app_id) or str(a.get("transaction_id")) == str(app_id)), None)
     if not app_req:
         return {"success": True, "message": "Approval action processed."}
 
@@ -227,9 +227,12 @@ def take_approval_action(req: ApprovalAction, approval_id: Optional[str] = None)
     txn_type = str(app_req.get("transaction_type", "")).upper()
     txn_id = app_req.get("transaction_id")
 
+    ind = None
+    po = None
+
     # Update target document status
     if "INDENT" in txn_type:
-        ind = next((i for i in db.get("indents", []) if i.get("id") == txn_id or i.get("indent_number") == txn_id), None)
+        ind = next((i for i in db.get("indents", []) if str(i.get("id")) == str(txn_id) or str(i.get("indent_number")) == str(txn_id)), None)
         if ind:
             ind["status"] = new_status
             if req.comments:
@@ -238,7 +241,7 @@ def take_approval_action(req: ApprovalAction, approval_id: Optional[str] = None)
                 ind["items"] = req.approved_items
 
     elif "PURCHASE" in txn_type or "PO" in txn_type:
-        po = next((p for p in db.get("purchase_orders", []) if p.get("id") == txn_id or p.get("po_number") == txn_id), None)
+        po = next((p for p in db.get("purchase_orders", []) if str(p.get("id")) == str(txn_id) or str(p.get("po_number")) == str(txn_id)), None)
         if po:
             po["status"] = new_status
 
@@ -276,5 +279,11 @@ def take_approval_action(req: ApprovalAction, approval_id: Optional[str] = None)
         "ip_address": "127.0.0.1"
     })
 
-    save_db()
+    save_db("approval_requests", record=app_req)
+    if ind:
+        save_db("indents", record=ind)
+    elif po:
+        save_db("purchase_orders", record=po)
+    save_db("approval_actions", record=act_entry)
+    save_db("audit_logs", record=db["audit_logs"][-1])
     return {"success": True, "message": f"Approval action '{req.action}' processed successfully.", "data": app_req}

@@ -264,6 +264,23 @@ def get_rfq_comparison(rfq_id: str):
         lowest_q = min(q_list, key=lambda x: float(x.get("total_landed_cost", 999999999)))
         lowest_id = lowest_q.get("id")
 
+    # Look up selection decision for this RFQ
+    decision = next((d for d in db.get("quotation_selection_decisions", []) if d.get("rfq_id") == rfq_id or d.get("rfq_id") == rfq.get("id") or d.get("rfq_id") == rfq.get("rfq_number")), None)
+    if not decision:
+        winning = next((q for q in q_list if q.get("is_selected") or q.get("status") == "Approved"), None)
+        if winning:
+            is_l1_win = lowest_id and winning.get("id") == lowest_id
+            decision = {
+                "id": f"dec-auto-{winning.get('id')}",
+                "rfq_id": rfq_id,
+                "selected_quotation_id": winning.get("id"),
+                "is_lowest_bidder": is_l1_win,
+                "selection_type": "Lowest Cost (L1)" if is_l1_win else "Non-Lowest with Justification",
+                "justification_remarks": winning.get("selection_justification") or "Supplier selection approved in quotation evaluation.",
+                "decided_by": winning.get("approved_by") or "Purchase Manager",
+                "decided_at": winning.get("updated_at") or winning.get("created_at")
+            }
+
     return {
         "success": True,
         "rfq": {
@@ -288,7 +305,7 @@ def get_rfq_comparison(rfq_id: str):
                 "previous_purchase_rate": 72000
             }
         ]),
-        "selectionDecision": None
+        "selectionDecision": decision
     }
 
 # =========================================================================
@@ -569,18 +586,30 @@ def select_winning_quotation(rfq_id: str, payload: Dict[str, Any]):
     if "quotation_selection_decisions" not in db:
         db["quotation_selection_decisions"] = []
 
+    sel_type = payload.get("selection_type") or ("Lowest Cost (L1)" if is_l1 else "Non-Lowest with Justification")
     decision = {
         "id": f"dec-{len(db['quotation_selection_decisions']) + 1}",
         "rfq_id": rfq_id,
         "selected_quotation_id": selected_qte_id,
         "is_lowest_bidder": is_l1,
+        "selection_type": sel_type,
         "justification_reason": justification,
-        "decided_by": payload.get("user_name", "Sarah Jenkins (Buyer)"),
+        "justification_remarks": justification or f"Awarded via {sel_type}",
+        "decided_by": payload.get("user_name", "Purchase Manager"),
         "decided_at": datetime.now().isoformat()
     }
     db["quotation_selection_decisions"].append(decision)
 
-    save_db()
+    # Update RFQ status so RFQ page reflects approved award
+    rfq_obj = next((r for r in db.get("rfqs", []) if r.get("id") == rfq_id or r.get("rfq_number") == rfq_id), None)
+    if rfq_obj:
+        rfq_obj["status"] = "Approved"
+        save_db("rfqs", record=rfq_obj)
+
+    save_db("quotations")
+    if winning_q:
+        save_db("purchase_orders")
+    save_db("quotation_selection_decisions", record=decision)
     return {"success": True, "data": decision, "message": f"Supplier selection decision recorded & Purchase Order created successfully. (L1: {is_l1})"}
 
 # =========================================================================

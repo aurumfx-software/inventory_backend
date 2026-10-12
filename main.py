@@ -21,6 +21,7 @@ from routers.inventory_ops import router as inventory_ops_router
 from routers.reports import router as reports_router
 from routers.settings_audit import router as settings_audit_router
 from routers.dashboard import router as dashboard_router
+from routers.billing import router as billing_router
 
 
 # FastAPI is exposed externally through Nginx at /api
@@ -67,6 +68,7 @@ app.include_router(inventory_ops_router)
 app.include_router(reports_router)
 app.include_router(settings_audit_router)
 app.include_router(dashboard_router)
+app.include_router(billing_router)
 
 # Shorthand Top-Level API Endpoints for Direct Data Access
 @app.get("/api/seed-demo")

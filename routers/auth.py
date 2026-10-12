@@ -79,7 +79,8 @@ def login(req: LoginRequest):
         {"id": "usr-05", "name": "Store Requester", "email": "requester@company.com", "phone": "9876543214", "password": "admin123", "role_id": "role-requester", "emp_code": "EMP-005", "department_id": "dept-01", "company_name": "Default Enterprise", "is_active": True},
         {"id": "usr-06", "name": "Finance Manager", "email": "finance@company.com", "phone": "9876543215", "password": "admin123", "role_id": "role-finance", "emp_code": "EMP-006", "department_id": "dept-01", "company_name": "Default Enterprise", "is_active": True},
         {"id": "usr-07", "name": "System Auditor", "email": "auditor@company.com", "phone": "9876543216", "password": "admin123", "role_id": "role-auditor", "emp_code": "EMP-007", "department_id": "dept-01", "company_name": "Default Enterprise", "is_active": True},
-        {"id": "usr-ashin", "name": "Ashin Demo Administrator", "email": "ashina123@gmail.com", "phone": "9876500001", "password": "ashin123", "role_id": "role-admin", "emp_code": "EMP-002", "department_id": "dept-01", "company_name": "Ashin Enterprise Demo", "is_demo": True, "is_active": True}
+        {"id": "usr-ashin", "name": "Ashin Demo Administrator", "email": "ashina123@gmail.com", "phone": "9876500001", "password": "ashin123", "role_id": "role-admin", "emp_code": "EMP-002", "department_id": "dept-01", "company_name": "Ashin Enterprise Demo", "is_demo": True, "is_active": True},
+        {"id": "usr-biller-01", "name": "Biller", "email": "biller@gmail.com", "phone": "9000000099", "password": "admin123", "role_id": "role-biller", "emp_code": "EMP-099", "department_id": "dept-01", "company_name": "Default Enterprise", "is_active": True}
     ]
 
     clean_identifier = identifier.lower()
@@ -313,7 +314,10 @@ def login_otp(req: VerifyOTPRequest):
 
     DEFAULT_SYSTEM_USERS = [
         {"id": "usr-01", "name": "System Administrator", "email": "admin@company.com", "phone": "9876543210", "password": "admin123", "role_id": "role-admin", "emp_code": "EMP-001", "department_id": "dept-01", "company_name": "Default Enterprise", "is_active": True},
-        {"id": "usr-ashin", "name": "Ashin Demo Administrator", "email": "ashina123@gmail.com", "phone": "8111814075", "password": "ashin123", "role_id": "role-admin", "emp_code": "EMP-002", "department_id": "dept-01", "company_name": "Ashin Enterprise Demo", "is_demo": True, "is_active": True}
+        {"id": "usr-ashin", "name": "Ashin Demo Administrator", "email": "ashina123@gmail.com", "phone": "8111814075", "password": "ashin123", "role_id": "role-admin", "emp_code": "EMP-002", "department_id": "dept-01", "company_name": "Ashin Enterprise Demo", "is_demo": True, "is_active": True},
+
+        # ── Biller Account ──
+        {"id": "usr-biller-01", "name": "Biller", "email": "biller@gmail.com", "phone": "9000000099", "password": "Test@123", "role_id": "role-biller", "emp_code": "EMP-099", "department_id": "dept-01", "company_name": "Apex Enterprises", "is_active": True}
     ]
 
     user = None
